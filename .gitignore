@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# 项目本地运行产物（不属于源码）
+config.toml
+captures/
+*.log
+
+# IDE
+.idea/
+.vscode/
