@@ -14,10 +14,10 @@ def fixtures() -> dict:
 
 @pytest.fixture(scope="session")
 def qapp():
-    """QGuiApplication 实例（offscreen 不可用时用真实平台）。"""
-    from PySide6.QtGui import QGuiApplication
+    """QApplication 实例（widget 需要；测试不 show 窗口）。"""
+    from PySide6.QtWidgets import QApplication
 
-    app = QGuiApplication.instance()
+    app = QApplication.instance()
     if app is None:
-        app = QGuiApplication([])
+        app = QApplication([])
     yield app

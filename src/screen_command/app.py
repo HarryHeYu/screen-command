@@ -8,6 +8,7 @@ OCR 等动作在 QThreadPool 后台线程执行，UI 不冻结，结果经信号
 
 from __future__ import annotations
 
+import threading
 import time
 
 from PySide6.QtCore import QObject, QRect, QRunnable, QThreadPool, Qt, Signal, Slot
@@ -87,6 +88,7 @@ class AppController(QObject):
         self.status = StatusWindow()
         self.status.capture_requested.connect(self.start_capture)
         self.status.quit_requested.connect(self.shutdown)
+        self.status.cancel_requested.connect(self._cancel_processing)
 
         self._menu: ActionMenu | None = None
         self._hotkey: GlobalHotkeyThread | None = None
@@ -261,18 +263,38 @@ class AppController(QObject):
         self.status.set_status(f"执行 {action.name} …")
         log.info("action %s: start", action.id)
 
+        # 协作式取消挂钩（v0.3）：网络类 provider 在分步执行时应检查该事件；
+        # 本地 OCR 单次调用不可中断，取消对其语义是"丢弃结果"（见 _cancel_processing）
+        self._ctx.cancel_token = threading.Event()
+        ctx = self._ctx
+
+        self.state = PROCESSING
+        self.status.set_processing(True)
         signals = _JobSignals()
         # 主线程持引用：防止 worker 线程结束时 signals 被析构、queued 信号丢失
         # （否则状态机会间歇性卡死在 PROCESSING，P1-2）
         self._active_signals = signals
         signals.done.connect(self._on_action_done)
-        ctx = self._ctx
         self._pool.start(
             _ActionJob(lambda: action.execute(ctx), signals, action.id)
         )
 
+    def _cancel_processing(self) -> None:
+        """用户取消执行中的动作：丢弃排队任务并回 Idle；迟到的结果被状态守卫丢弃。"""
+        if self.state != PROCESSING:
+            return
+        if self._ctx is not None and isinstance(self._ctx.cancel_token, threading.Event):
+            self._ctx.cancel_token.set()
+        self._pool.clear()  # 清掉尚未启动的排队 job；运行中的 job 无法强杀
+        self._active_signals = None
+        self.state = IDLE
+        self.status.set_processing(False)
+        self.status.set_status("已取消 — Ctrl+Shift+A 重新框选")
+        log.info("state: idle (action cancelled by user)")
+
     def _on_action_done(self, result: ActionResult) -> None:
         self._active_signals = None
+        self.status.set_processing(False)
         log.info(
             "action %s: done ok=%s in %.0f ms", result.action_id, result.ok, result.elapsed_ms
         )

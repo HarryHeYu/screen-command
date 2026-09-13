@@ -28,7 +28,9 @@ if TYPE_CHECKING:
 class ActionContext:
     """一次动作执行的输入。image_png 是框选区域的物理分辨率 PNG 字节流。
 
-    cancel_token: v0.3 预留的协作式取消挂钩，当前恒为 None（见 docs/ARCHITECTURE.md）。
+    cancel_token: 协作式取消挂钩（threading.Event）。AppController 在每次执行
+    动作前注入新事件，用户取消时置位；本地 OCR 不可中断，取消语义为丢弃结果；
+    网络类 provider 应在分步执行时检查该事件。
     """
 
     image_png: bytes | None = None

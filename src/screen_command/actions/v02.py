@@ -298,20 +298,128 @@ class ExplainErrorAction(Action):
                 advice.append("尝试减小 batch size；用 `torch.cuda.empty_cache()` 排除碎片；检查是否有张量意外驻留显存。")
             sections.append(("建议检查方向", "\n".join(f"- {a}" for a in advice)))
         else:
-            # 通用错误线索：error/fatal/failed 等关键词行
-            keys = [
-                l for l in lines
-                if re.search(r"\b(error|fatal|failed|failure|exception|denied|refused|timed? ?out)\b",
-                             l, re.IGNORECASE)
-            ]
-            if keys:
-                sections.append(("发生了什么", "识别内容中包含以下错误信息："))
-                sections.append(("关键错误", "\n".join(f"- `{k}`" for k in keys[:5])))
-                sections.append(("建议检查方向",
-                                 "- 将关键错误行作为关键词在项目文档/搜索引擎中检索\n"
-                                 "- 确认上下文（命令参数、路径、网络、权限）是否符合预期"))
+            specialized = self._specialized_rules(lines, text)
+            if specialized is not None:
+                sections.extend(specialized)
             else:
-                sections.append(("发生了什么", "未检测到明确的错误模式（Traceback / error / fatal 等）。"))
-                sections.append(("建议检查方向",
-                                 "- 如果这是报错，尝试框选完整错误信息（包含 Traceback 首行到最后一行）"))
+                # 通用错误线索：error/fatal/failed 等关键词行
+                keys = [
+                    l for l in lines
+                    if re.search(r"\b(error|fatal|failed|failure|exception|denied|refused|timed? ?out)\b",
+                                 l, re.IGNORECASE)
+                ]
+                if keys:
+                    sections.append(("发生了什么", "识别内容中包含以下错误信息："))
+                    sections.append(("关键错误", "\n".join(f"- `{k}`" for k in keys[:5])))
+                    sections.append(("建议检查方向",
+                                     "- 将关键错误行作为关键词在项目文档/搜索引擎中检索\n"
+                                     "- 确认上下文（命令参数、路径、网络、权限）是否符合预期"))
+                else:
+                    sections.append(("发生了什么", "未检测到明确的错误模式（Traceback / error / fatal 等）。"))
+                    sections.append(("建议检查方向",
+                                     "- 如果这是报错，尝试框选完整错误信息（包含 Traceback 首行到最后一行）"))
         return "\n\n".join(f"**{t}**\n\n{body}" for t, body in sections)
+
+    # -- 非 Python 的规则族（产品定义第 28 节：git / node / C/C++ / shell）--
+
+    _GIT_FATAL = re.compile(r"\bfatal:\s*(.+)", re.IGNORECASE)
+    _GIT_KNOWN = [
+        (re.compile(r"not a git repository", re.I),
+         "当前目录不是 Git 仓库（或不在仓库内）。",
+         "确认工作目录；必要时先 `git init` 或 `git clone`。"),
+        (re.compile(r"merge conflict|CONFLICT", re.I),
+         "合并/变基时存在未解决的冲突。",
+         "编辑冲突文件后 `git add` 并 `git commit`，或用 `git merge --abort` 回退。"),
+        (re.compile(r"rejected.*non-fast-forward|fetch first", re.I),
+         "远程包含本地没有的提交，推送被拒绝。",
+         "先 `git pull --rebase`（或 `git pull`）合并远程改动后再推送。"),
+        (re.compile(r"pathspec .* did not match", re.I),
+         "指定的分支 / 标签 / 路径不存在。",
+         "用 `git branch -a`、`git status` 确认名称拼写。"),
+    ]
+    _NODE_MODULE = re.compile(r"Cannot find module '([^']+)'")
+    _NPM_ERR = re.compile(r"\bnpm ERR!", re.IGNORECASE)
+    _MSVC = re.compile(r"\b(error C\d{4}|LNK\d{4})", re.IGNORECASE)
+    _MINGW_LINK = re.compile(r"\bundefined reference to\b", re.IGNORECASE)
+    _SHELL_COMMON = re.compile(r"\b(command not found)\b", re.IGNORECASE)
+    _PERM_DENIED = re.compile(r"\bpermission denied\b", re.IGNORECASE)
+
+    def _specialized_rules(self, lines: list[str], text: str):
+        """返回规则段落列表；不匹配任何已知错误族时返回 None（走通用兜底）。"""
+        joined = "\n".join(lines)
+
+        # git
+        m = self._GIT_FATAL.search(joined)
+        if m:
+            msg = m.group(1).strip()
+            what = f"Git 报错：`fatal: {msg}`"
+            causes, advice = [], []
+            for pat, cause, adv in self._GIT_KNOWN:
+                if pat.search(joined):
+                    causes.append(cause)
+                    advice.append(adv)
+                    break
+            if not causes:
+                causes.append(f"Git 在「{msg[:60]}」这一步失败，通常是参数、路径或仓库状态问题。")
+                advice.append("将 fatal 后的消息作为关键词检索；`git status` 确认当前仓库状态。")
+            return [("发生了什么", what),
+                    ("可能原因", "\n".join(f"- {c}" for c in causes)),
+                    ("建议检查方向", "\n".join(f"- {a}" for a in advice))]
+
+        # node / npm
+        m = self._NODE_MODULE.search(joined)
+        if m:
+            mod = m.group(1)
+            return [
+                ("发生了什么", f"Node.js 找不到模块 `{mod}`。"),
+                ("可能原因", f"- 依赖未安装（缺少 `{mod}`）\n"
+                             f"- require/import 路径拼写错误，或模块不在 node_modules"),
+                ("建议检查方向",
+                 f"- 在项目根目录执行 `npm install {mod}`（或对应包管理器命令）\n"
+                 "- 检查 import 路径大小写与相对路径是否正确"),
+            ]
+        if self._NPM_ERR.search(joined):
+            return [
+                ("发生了什么", "npm 命令执行失败（npm ERR!）。"),
+                ("可能原因", "- 上方第一条 npm ERR! 行通常给出直接原因（脚本失败 / 网络 / 权限）"),
+                ("建议检查方向",
+                 "- 查看第一条 `npm ERR!` 行与完整日志路径\n"
+                 "- 删除 node_modules 后重新 `npm install` 可排除依赖损坏"),
+            ]
+
+        # C/C++ 编译器 / 链接器
+        if self._MSVC.search(joined):
+            codes = sorted(set(re.findall(r"\b((?:error |LNK)\w*\s?C?\d{4})", joined, re.I)))[:3]
+            return [
+                ("发生了什么", "MSVC 编译/链接错误" + (f"（{', '.join(codes)}）" if codes else "") + "。"),
+                ("可能原因", "- 编译错误 Cxxxx：语法 / 类型 / 未声明标识符\n"
+                             "- 链接错误 LNKxxxx：声明了符号但找不到定义，或库未链接"),
+                ("建议检查方向",
+                 "- 用错误码（如 `C2065`）检索 Microsoft 文档，定位到具体行\n"
+                 "- LNK2019/LNK1120：检查函数签名一致性与 .lib 依赖配置"),
+            ]
+        if self._MINGW_LINK.search(joined):
+            return [
+                ("发生了什么", "链接阶段出现 `undefined reference`（MinGW/g++）。"),
+                ("可能原因", "- 只声明未定义（函数名/签名不匹配），或实现文件没有参与编译/链接"),
+                ("建议检查方向",
+                 "- 确认实现该符号的 .cpp/.o 文件在编译命令里\n"
+                 "- 检查类成员函数是否漏写 `ClassName::` 前缀"),
+            ]
+
+        # shell
+        if self._SHELL_COMMON.search(joined):
+            return [
+                ("发生了什么", "Shell 找不到要执行的命令。"),
+                ("可能原因", "- 命令未安装，或不在 PATH 中\n- 命令名拼写错误"),
+                ("建议检查方向",
+                 "- 确认命令已安装且其目录在 PATH 里（Windows 可用 `where 命令名`）"),
+            ]
+        if self._PERM_DENIED.search(joined):
+            return [
+                ("发生了什么", "操作系统拒绝了访问（permission denied）。"),
+                ("可能原因", "- 文件被占用 / 只读 / 需要更高权限\n- SSH 私钥权限过宽"),
+                ("建议检查方向",
+                 "- 确认文件未被其他程序锁定；必要时以适当权限重试"),
+            ]
+        return None

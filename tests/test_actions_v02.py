@@ -190,3 +190,71 @@ class TestExplainErrorAction:
         """无 LLM provider 时 Explain 仍应可用（规则分析）。"""
         a = ExplainErrorAction(MockOcrProvider(), llm_provider=None)
         assert a is not None
+
+
+class TestExplainSpecializedRules:
+    """v0.3 规则族：git / node / C/C++ / shell（产品定义第 28 节）。"""
+
+    def _explain(self, monkeypatch, *lines: str) -> str:
+        monkeypatch.setattr(
+            MockOcrProvider, "recognize",
+            lambda self, png, language=None: _ocr_lines(*lines),
+        )
+        r = ExplainErrorAction(MockOcrProvider()).execute(ActionContext(image_png=b"i"))
+        assert r.ok
+        return r.markdown
+
+    def test_git_not_a_repository(self, monkeypatch):
+        md = self._explain(
+            monkeypatch, "git status", "fatal: not a git repository (or any of the parent directories): .git"
+        )
+        assert "Git 报错" in md
+        assert "不是 Git 仓库" in md
+        assert "git init" in md
+
+    def test_git_push_rejected(self, monkeypatch):
+        md = self._explain(
+            monkeypatch,
+            "git push origin main",
+            "fatal: failed to push some refs (hint: Updates were rejected because the tip of your branch is behind)",
+        )
+        assert "推送被拒绝" in md or "rejected" in md.lower()
+
+    def test_node_cannot_find_module(self, monkeypatch):
+        md = self._explain(
+            monkeypatch, "node server.js", "Error: Cannot find module 'express'"
+        )
+        assert "express" in md
+        assert "npm install" in md
+
+    def test_msvc_compile_error(self, monkeypatch):
+        md = self._explain(
+            monkeypatch, "main.cpp(12): error C2065: 'count': undeclared identifier"
+        )
+        assert "MSVC" in md
+        assert "C2065" in md
+
+    def test_mingw_link_error(self, monkeypatch):
+        md = self._explain(
+            monkeypatch, "main.o:main.cpp:(.text+0x10): undefined reference to `foo(int)'"
+        )
+        assert "undefined reference" in md
+        assert "MinGW" in md or "链接" in md
+
+    def test_shell_command_not_found(self, monkeypatch):
+        md = self._explain(monkeypatch, "gitp status", "gitp: command not found")
+        assert "找不到" in md
+        assert "PATH" in md
+
+    def test_permission_denied(self, monkeypatch):
+        md = self._explain(monkeypatch, "open config.json", "Error: EACCES: permission denied, open 'config.json'")
+        assert "permission denied" in md.lower()
+
+    def test_python_traceback_still_wins_over_generic(self, monkeypatch):
+        """Python traceback 优先于 shell/git 规则族。"""
+        md = self._explain(
+            monkeypatch,
+            "Traceback (most recent call last):",
+            "PermissionError: [Errno 13] Permission denied: 'config.json'",
+        )
+        assert "PermissionError" in md
