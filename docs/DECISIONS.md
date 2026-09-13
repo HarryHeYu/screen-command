@@ -124,6 +124,18 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 改为阻塞 `GetMessageW`，`stop()` 用 `PostThreadMessage(WM_QUIT)` 唤醒退出：
 触发零延迟、零功耗，停止语义也更直接。
 
+## D12. 默认热键：Alt+W / Alt+X，并支持 config.toml 覆盖
+
+**日期**: 2026-09-13
+
+产品定义的 Ctrl+Shift+A 在用户机器上与常驻软件（输入法/音乐/外设工具）冲突。
+实测探测（RegisterHotKey 逐个尝试）发现该机器上 Ctrl+Shift+字母、Ctrl+Alt+字母
+几乎全部被占用，Win+字母被系统占用；单 Alt 组合大量空闲。
+
+选定 **Alt+W（框选）/ Alt+X（快速 OCR 复制）**：单修饰键左手可及、
+本机实测空闲。同时把组合键做成 `config.toml [hotkey]` 可配置——
+再次撞车时用户改配置即可。热键注册失败仍优雅降级（Capture 按钮兜底）。
+
 ## 顺序调整记录
 
 - 2026-09-13: OCR polish（D8 CJK 规整）自 v0.2 提前 —— 属于第一阶段「OCR 结果基本正确」验收范畴。

@@ -1,0 +1,8 @@
+# Screen Command 配置（可选）。复制为 config.toml 后生效；不创建则用默认值。
+# 仅影响本程序运行行为，不修改任何系统设置。
+
+[hotkey]
+# 全局快捷键，格式 "ctrl|shift|alt|win + 字母/数字"（支持 1-2 个修饰键）。
+# 若与其他软件的全局热键冲突（注册失败会提示），改成别的组合即可。
+capture = "alt+w"           # 框选 → 动作菜单
+quick_ocr = "alt+x"         # 框选 → OCR → 复制到剪贴板

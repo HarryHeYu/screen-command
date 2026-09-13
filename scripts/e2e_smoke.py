@@ -76,7 +76,7 @@ def main() -> int:
     controller.run()
     for _ in range(30):
         app.processEvents()
-        if controller._hotkey and "ctrl+shift+a" in controller._hotkey.registered_combos:
+        if controller._hotkey and "alt+w" in controller._hotkey.registered_combos:
             hotkey_ok = True
             break
         if controller._hotkey and not controller._hotkey.is_alive():

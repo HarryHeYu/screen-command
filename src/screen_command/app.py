@@ -86,6 +86,8 @@ class AppController(QObject):
         self._active_signals: _JobSignals | None = None
 
         self.status = StatusWindow()
+        self._capture_combo = "alt+w"        # run() 里被 config.toml 的实际值覆盖
+        self._quick_combo = "alt+x"
         self.status.capture_requested.connect(self.start_capture)
         self.status.quit_requested.connect(self.shutdown)
         self.status.cancel_requested.connect(self._cancel_processing)
@@ -101,10 +103,16 @@ class AppController(QObject):
     # -- lifecycle ---------------------------------------------------------
 
     def run(self) -> None:
+        from .config import load_hotkeys
+
         self.status.show()
+        hotkeys = load_hotkeys()
+        self._capture_combo = hotkeys.capture
+        self._quick_combo = hotkeys.quick_ocr
+        self.status.set_hotkey_labels(hotkeys.capture, hotkeys.quick_ocr)
         self._hotkey = GlobalHotkeyThread({
-            "ctrl+shift+a": self._hotkey_bridge.triggered.emit,
-            "ctrl+shift+1": self._quick_bridge.triggered.emit,
+            hotkeys.capture: self._hotkey_bridge.triggered.emit,
+            hotkeys.quick_ocr: self._quick_bridge.triggered.emit,
         })
         self._hotkey.start()
         self._watch_hotkey()
@@ -180,7 +188,7 @@ class AppController(QObject):
         self._snapshots = []
         self._pending_quick = False
         self.state = IDLE
-        self.status.set_status("已取消 — Ctrl+Shift+A 重新框选")
+        self.status.set_status("已取消 — 按热键重新框选")
         log.info("state: idle (capture cancelled)")
 
     def _close_overlays(self) -> None:
@@ -237,7 +245,7 @@ class AppController(QObject):
             return  # 菜单 hide 可能在其他状态由组合路径触发，勿回拉状态机
         self._pending_quick = False
         self.state = IDLE
-        self.status.set_status("已取消 — Ctrl+Shift+A 重新框选")
+        self.status.set_status("已取消 — 按热键重新框选")
 
     # -- action execution --------------------------------------------------
 
@@ -255,7 +263,7 @@ class AppController(QObject):
             )
             if not path:
                 self.state = IDLE
-                self.status.set_status("已取消保存 — Ctrl+Shift+A 重新框选")
+                self.status.set_status("已取消保存 — 按热键重新框选")
                 return
             self._ctx.options["output_path"] = path
 
@@ -289,7 +297,7 @@ class AppController(QObject):
         self._active_signals = None
         self.state = IDLE
         self.status.set_processing(False)
-        self.status.set_status("已取消 — Ctrl+Shift+A 重新框选")
+        self.status.set_status("已取消 — 按热键重新框选")
         log.info("state: idle (action cancelled by user)")
 
     def _on_action_done(self, result: ActionResult) -> None:
@@ -305,7 +313,7 @@ class AppController(QObject):
             QApplication.clipboard().setText(result.text)
             result.data["copied"] = True
         self.state = SHOWING
-        self.status.set_status("完成 — 关闭结果窗或按 Ctrl+Shift+A 重新框选")
+        self.status.set_status("完成 — 关闭结果窗或按热键重新框选")
         if self._result_win is None:
             self._result_win = ResultWindow()
             self._result_win.retry_requested.connect(self._retry_last)
@@ -316,7 +324,7 @@ class AppController(QObject):
     def _on_result_closed(self) -> None:
         if self.state == SHOWING:
             self.state = IDLE
-            self.status.set_status("就绪 — Ctrl+Shift+A 框选，Ctrl+Shift+1 快速复制")
+            self.status.set_status("就绪 — 按热键框选")
 
     def _retry_last(self) -> None:
         if self._current_action and self._ctx:

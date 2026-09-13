@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_run = sub.add_parser("run", help="启动 GUI（Ctrl+Shift+A 框选）")
+    p_run = sub.add_parser("run", help="启动 GUI（热键框选，默认 Alt+W）")
     p_run.set_defaults(func=_cmd_run)
 
     p_cap = sub.add_parser("capture", help="同 run（GUI 一次框选流程）")

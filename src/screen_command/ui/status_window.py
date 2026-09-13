@@ -17,15 +17,16 @@ class StatusWindow(QWidget):
         self.setWindowTitle("Screen Command (dev)")
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
         self.resize(300, 170)
+        self._capture_combo = "alt+w"
+        self._quick_combo = "alt+x"
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
 
-        self._status = QLabel(
-            "就绪 — Ctrl+Shift+A 框选菜单，Ctrl+Shift+1 快速 OCR 复制"
-        )
+        self._status = QLabel()
         self._status.setWordWrap(True)
-        btn = QPushButton("Capture (Ctrl+Shift+A)")
+        self._reset_ready_text()
+        btn = QPushButton(f"Capture ({self._capture_combo.upper()})")
         btn.clicked.connect(self.capture_requested.emit)
         self._cancel_btn = QPushButton("取消当前动作")
         self._cancel_btn.clicked.connect(self.cancel_requested.emit)
@@ -46,12 +47,24 @@ class StatusWindow(QWidget):
         """执行动作期间显示取消入口（异步任务必须可取消，产品定义第 49 节）。"""
         self._cancel_btn.setVisible(processing)
 
+    def set_hotkey_labels(self, capture: str, quick_ocr: str) -> None:
+        """AppController 依据 config.toml 加载实际组合键后更新文案。"""
+        self._capture_combo = capture
+        self._quick_combo = quick_ocr
+        btn = self.layout().itemAt(1).widget()
+        if isinstance(btn, QPushButton):
+            btn.setText(f"Capture ({self._capture_combo.upper()})")
+        self._reset_ready_text()
+
     def set_hotkey_ok(self, ok: bool) -> None:
         if ok:
-            self._status.setText(
-                "热键已就绪 — Ctrl+Shift+A 框选菜单，Ctrl+Shift+1 快速 OCR 复制"
-            )
+            self._reset_ready_text()
         else:
             self._status.setText(
-                "热键注册失败（可能被其他程序占用）— 请使用 Capture 按钮"
+                "热键注册失败（可能被其他程序占用）— 请使用 Capture 按钮，"
+                "或在 config.toml 的 [hotkey] 里换一组组合键"
             )
+
+    def _reset_ready_text(self) -> None:
+        cap, quick = self._capture_combo.upper(), self._quick_combo.upper()
+        self._status.setText(f"就绪 — {cap} 框选菜单，{quick} 快速 OCR 复制")

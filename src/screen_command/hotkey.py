@@ -1,6 +1,7 @@
 """全局快捷键：运行期 RegisterHotKey（进程存活期有效，退出即释放）。
 
-支持多组快捷键（如 Ctrl+Shift+A 框选、Ctrl+Shift+1 快速 OCR+复制）。
+组合键字符串（如 "ctrl+alt+q"）由 parse_combo 通用解析，默认值见 config.py，
+用户可在项目根目录 config.toml 的 [hotkey] 段覆盖。
 不写注册表、不改系统快捷键设置，程序关闭后系统不留任何痕迹。
 注册失败（如快捷键被占用）不阻塞核心链路，GUI 按钮仍可用。
 """
@@ -24,16 +25,29 @@ MOD_SHIFT = 0x0004
 MOD_WIN = 0x0008
 MOD_NOREPEAT = 0x4000
 
-_PRESETS = {
-    "ctrl+shift+a": (MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 0x41),  # 'A'
-    "ctrl+shift+1": (MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 0x31),  # '1'
-}
+_MOD_MAP = {"ctrl": MOD_CONTROL, "shift": MOD_SHIFT, "alt": MOD_ALT, "win": MOD_WIN}
+
+
+def parse_combo(combo: str) -> tuple[int, int]:
+    """'ctrl+alt+q' → (mods, vk)。支持 1–2 个 ctrl/shift/alt/win + 单个字母或数字。"""
+    parts = [p.strip().lower() for p in combo.split("+")]
+    if len(parts) not in (2, 3):
+        raise ValueError(f"invalid combo {combo!r}: expected 'mod+key' or 'mod+mod+key'")
+    *mods_raw, key = parts
+    mods = MOD_NOREPEAT
+    for m in mods_raw:
+        if m not in _MOD_MAP:
+            raise ValueError(f"unknown modifier {m!r} in {combo!r}")
+        mods |= _MOD_MAP[m]
+    if len(key) == 1 and key.isalnum():
+        return mods, ord(key.upper())
+    raise ValueError(f"unsupported key {key!r} in {combo!r} (letter/digit only)")
 
 
 class GlobalHotkeyThread(threading.Thread):
     """在独立 Win32 消息循环线程中注册并监听多组全局快捷键。
 
-    combos: {"ctrl+shift+a": callback, ...}，callback 在热键线程被调用——
+    combos: {组合键字符串: callback}，callback 在热键线程被调用——
     跨线程使用时请通过 Qt Signal（线程安全）转发。
     """
 
@@ -60,11 +74,12 @@ class GlobalHotkeyThread(threading.Thread):
         self._thread_id = kernel32.GetCurrentThreadId()
 
         for i, (combo, cb) in enumerate(self._combos.items()):
-            if combo not in _PRESETS:
-                log.error("hotkey: unknown combo %r", combo)
+            try:
+                mods, vk = parse_combo(combo)
+            except ValueError as exc:
+                log.error("hotkey: %s", exc)
                 continue
             hotkey_id = 0xB000 + i
-            mods, vk = _PRESETS[combo]
             if user32.RegisterHotKey(None, hotkey_id, mods, vk):
                 self._callbacks[hotkey_id] = cb
                 self._registered.add(combo)
@@ -97,6 +112,4 @@ class GlobalHotkeyThread(threading.Thread):
     def stop(self) -> None:
         self.stop_event.set()
         if self._thread_id:
-            ctypes.windll.user32.PostThreadMessageW(
-                self._thread_id, WM_QUIT, 0, 0
-            )
+            ctypes.windll.user32.PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0)

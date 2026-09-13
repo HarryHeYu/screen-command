@@ -12,7 +12,7 @@ It collapses the usual "take a screenshot → save it → open a tool → upload
 - **Local OCR**: powered by the built-in Windows OCR engine (Windows.Media.Ocr). English and Chinese, fully offline.
 - **Action system**: OCR, copy text, translate, extract code, convert to Markdown, explain errors, save image — chosen from a floating menu with number-key shortcuts.
 - **Error explanation**: offline rule-based analysis of captured error output (Python tracebacks, CUDA OOM, git, Node.js, MSVC/MinGW, shell errors). Optional LLM enhancement.
-- **Quick action**: `Ctrl+Shift+1` captures, OCRs, and copies to the clipboard without opening the menu.
+- **Quick action**: `Alt+X` captures, OCRs, and copies to the clipboard without opening the menu.
 - **Test harness**: run any action on an image file from the CLI — automated tests don't need a real screen.
 
 ## Setup
@@ -28,12 +28,12 @@ python -m venv .venv
 .venv\Scripts\python -m screen_command run
 ```
 
-After the app starts, press `Ctrl+Shift+A` to start a capture, or click the Capture button in the status window. Hotkeys are registered at process lifetime only — the app leaves no persistent changes behind. If a hotkey is taken by another program, registration fails with a visible hint and the Capture button still works.
+After the app starts, press `Alt+W` to start a capture, or click the Capture button in the status window. Hotkeys are registered at process lifetime only — the app leaves no persistent changes behind. If a hotkey is taken by another program, registration fails with a visible hint and the Capture button still works.
 
 ## Usage
 
 1. **Launch**: run `.venv\Scripts\python -m screen_command run`. A small always-on-top status window appears.
-2. **Capture**: press `Ctrl+Shift+A` (or click the Capture button). The screen dims and freezes; hold the left mouse button and drag a rectangle, release to confirm. The selected area returns to full brightness and shows its pixel size while dragging. Press `Esc` or click without dragging to cancel at any time.
+2. **Capture**: press `Alt+W` (or click the Capture button). The screen dims and freezes; hold the left mouse button and drag a rectangle, release to confirm. The selected area returns to full brightness and shows its pixel size while dragging. Press `Esc` or click without dragging to cancel at any time.
 3. **Pick an action**: the action menu pops up next to your selection — click an entry or press its number key:
 
    | Key | Action | What it does |
@@ -47,7 +47,7 @@ After the app starts, press `Ctrl+Shift+A` to start a capture, or click the Capt
    | 7 | Save image | Save the captured region as PNG (the only action that writes a file) |
 
 4. **Read the result**: actions run in the background; the result window then shows the text — selectable, with **Copy**, **Edit** (make it editable to tweak before copying), **Retry**, **Another action** (re-run on the same selection without recapturing) and **Close**. A "cancel current action" button appears on the status window while an action is running.
-5. **Quick path**: `Ctrl+Shift+1` skips the menu — capture, OCR, and the result lands on your clipboard automatically. Ideal for the frequent "copy that on-screen text" case.
+5. **Quick path**: `Alt+X` skips the menu — capture, OCR, and the result lands on your clipboard automatically. Ideal for the frequent "copy that on-screen text" case.
 
 ## CLI
 
@@ -63,8 +63,10 @@ screen_command process <img> --action ocr|copy_text|translate|code|markdown|expl
 
 | Hotkey | Action |
 |---|---|
-| `Ctrl+Shift+A` | Select a screen region, then pick an action |
-| `Ctrl+Shift+1` | Select → OCR → copy to clipboard |
+| `Alt+W` | Select a screen region, then pick an action |
+| `Alt+X` | Select → OCR → copy to clipboard |
+
+Hotkeys can be changed in `config.toml` (see `config.example.toml`). If a combination is already taken by an input method, media player, or another resident app, simply pick a different one there.
 
 ## Tests
 
