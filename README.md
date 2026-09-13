@@ -30,6 +30,25 @@ python -m venv .venv
 
 After the app starts, press `Ctrl+Shift+A` to start a capture, or click the Capture button in the status window. Hotkeys are registered at process lifetime only — the app leaves no persistent changes behind. If a hotkey is taken by another program, registration fails with a visible hint and the Capture button still works.
 
+## Usage
+
+1. **Launch**: run `.venv\Scripts\python -m screen_command run`. A small always-on-top status window appears.
+2. **Capture**: press `Ctrl+Shift+A` (or click the Capture button). The screen dims and freezes; hold the left mouse button and drag a rectangle, release to confirm. The selected area returns to full brightness and shows its pixel size while dragging. Press `Esc` or click without dragging to cancel at any time.
+3. **Pick an action**: the action menu pops up next to your selection — click an entry or press its number key:
+
+   | Key | Action | What it does |
+   |---|---|---|
+   | 1 | OCR | Turn the selected pixels into plain text |
+   | 2 | Copy text | OCR, then put the text on the clipboard |
+   | 3 | Translate | OCR then translate (needs a configured provider; shows a hint otherwise) |
+   | 4 | Extract code | Rebuild indentation, strip line numbers, output a code block |
+   | 5 | To Markdown | Structure the text as lists / links / paragraphs |
+   | 6 | Explain error | Analyze captured error output (offline rules, no network) |
+   | 7 | Save image | Save the captured region as PNG (the only action that writes a file) |
+
+4. **Read the result**: actions run in the background; the result window then shows the text — selectable, with **Copy**, **Edit** (make it editable to tweak before copying), **Retry**, **Another action** (re-run on the same selection without recapturing) and **Close**. A "cancel current action" button appears on the status window while an action is running.
+5. **Quick path**: `Ctrl+Shift+1` skips the menu — capture, OCR, and the result lands on your clipboard automatically. Ideal for the frequent "copy that on-screen text" case.
+
 ## CLI
 
 ```bash
