@@ -24,8 +24,9 @@ cd screen-command
 python -m venv .venv
 .venv\Scripts\python -m pip install -e .
 
-# 启动
+# 启动（editable 安装后两种写法等价）
 .venv\Scripts\python -m screen_command run
+.venv\Scripts\screen_command run
 ```
 
 启动后按 `Alt+W` 框选，或点击状态窗口的 Capture 按钮。快捷键为运行期注册，程序退出即释放，不修改任何系统设置。如果快捷键被其他软件占用，注册会失败并提示，Capture 按钮始终可用。
@@ -33,7 +34,7 @@ python -m venv .venv
 ## 如何使用
 
 1. **启动**：运行 `.venv\Scripts\python -m screen_command run`，屏幕上会出现一个置顶的状态窗口。
-2. **框选**：按 `Alt+W`（或点状态窗口的 Capture 按钮），屏幕变暗并冻结当前画面；按住鼠标左键拖出一个矩形，松开即完成框选。拖拽过程中选区会恢复亮度并显示实际像素尺寸。按 `Esc` 或单击（不拖动）可随时取消。
+2. **框选**：按 `Alt+W`（或点状态窗口的 Capture 按钮），屏幕变暗并冻结当前画面；按住鼠标左键拖出一个矩形，松开即完成框选。拖拽过程中选区会恢复亮度并显示实际像素尺寸。按 `Esc`、右键或单击（不拖动）可随时取消。
 3. **选择动作**：松开鼠标后，选区旁弹出动作菜单，点击动作或直接按数字键：
 
    | 键 | 动作 | 说明 |
@@ -66,7 +67,7 @@ screen_command process <img> --action ocr|copy_text|translate|code|markdown|expl
 | `Alt+W` | 框选屏幕区域，弹出动作菜单 |
 | `Alt+X` | 框选 → OCR → 复制到剪贴板 |
 
-热键可在项目根目录 `config.toml` 里改（参考 `config.example.toml`）。若与输入法、音乐软件等常驻程序的全局热键冲突（启动时状态窗口会提示注册失败），换一组即可，无需改代码。
+热键可在项目根目录 `config.toml` 里改（参考 `config.example.toml`）。查找顺序：环境变量 `SCREEN_COMMAND_CONFIG` → 当前工作目录 → 仓库根目录。若与输入法、音乐软件等常驻程序的全局热键冲突（启动时状态窗口会提示注册失败，部分失败会点名哪一组），换一组即可，无需改代码。
 
 ## 测试
 

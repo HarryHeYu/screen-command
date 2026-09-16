@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "screen-command"
-version = "0.2.0"
+version = "0.2.1"
 description = "Select anything on screen, turn it into usable data: capture -> OCR -> act."
 requires-python = ">=3.11,<3.14"
 dependencies = [
@@ -21,6 +21,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+
+[project.scripts]
+screen_command = "screen_command.__main__:main"
+screen-command = "screen_command.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

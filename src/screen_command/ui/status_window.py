@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 
@@ -26,8 +25,8 @@ class StatusWindow(QWidget):
         self._status = QLabel()
         self._status.setWordWrap(True)
         self._reset_ready_text()
-        btn = QPushButton(f"Capture ({self._capture_combo.upper()})")
-        btn.clicked.connect(self.capture_requested.emit)
+        self._capture_btn = QPushButton(f"Capture ({self._capture_combo.upper()})")
+        self._capture_btn.clicked.connect(self.capture_requested.emit)
         self._cancel_btn = QPushButton("取消当前动作")
         self._cancel_btn.clicked.connect(self.cancel_requested.emit)
         self._cancel_btn.setVisible(False)  # 仅执行动作期间可见
@@ -35,7 +34,7 @@ class StatusWindow(QWidget):
         quit_btn.clicked.connect(self.quit_requested.emit)
 
         layout.addWidget(self._status)
-        layout.addWidget(btn)
+        layout.addWidget(self._capture_btn)
         layout.addWidget(self._cancel_btn)
         layout.addWidget(quit_btn)
         layout.addStretch(1)
@@ -51,10 +50,28 @@ class StatusWindow(QWidget):
         """AppController 依据 config.toml 加载实际组合键后更新文案。"""
         self._capture_combo = capture
         self._quick_combo = quick_ocr
-        btn = self.layout().itemAt(1).widget()
-        if isinstance(btn, QPushButton):
-            btn.setText(f"Capture ({self._capture_combo.upper()})")
+        self._capture_btn.setText(f"Capture ({self._capture_combo.upper()})")
         self._reset_ready_text()
+
+    def set_hotkey_status(self, registered: set[str], capture: str, quick_ocr: str) -> None:
+        """按实际注册结果更新状态：全部成功 / 部分失败 / 全部失败。"""
+        self.set_hotkey_labels(capture, quick_ocr)
+        have = {c.lower() for c in registered}
+        missing = [c for c in (capture, quick_ocr) if c.lower() not in have]
+        if not missing:
+            self._reset_ready_text()
+            return
+        if len(missing) == 2:
+            self._status.setText(
+                "热键全部注册失败（可能被其他程序占用）— 请使用 Capture 按钮，"
+                "或在 config.toml 的 [hotkey] 里换一组组合键"
+            )
+            return
+        ok = [c.upper() for c in (capture, quick_ocr) if c.lower() in have]
+        self._status.setText(
+            f"部分热键注册失败：{' / '.join(m.upper() for m in missing)}（可能被占用）。"
+            f"已生效：{' / '.join(ok)}。可在 config.toml 更换。"
+        )
 
     def set_hotkey_ok(self, ok: bool) -> None:
         if ok:

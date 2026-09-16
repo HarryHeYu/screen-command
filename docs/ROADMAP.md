@@ -29,6 +29,15 @@
 - [x] LLMProvider / TranslationProvider 抽象（提前自 v0.3 的 provider abstraction 部分）
 - [x] Quick Actions（提前自 v0.5：`Ctrl+Shift+1` = 框选→OCR→复制，多热键支持）
 
+## v0.2.1 — 稳定性与可用性（已完成 2026-09-16）
+- [x] `config.toml` 从项目根 / cwd / `SCREEN_COMMAND_CONFIG` 加载（不再误读 `src/config.toml`）
+- [x] OCR 构造参数 / CLI `--language` 真正用于选引擎
+- [x] 取消后再跑新动作时，丢弃迟到的旧任务结果（job 代数）
+- [x] 热键注册改为 `wait_ready`；部分失败时点名哪一组没注册上
+- [x] 打包入口 `screen_command` / `screen-command` 控制台脚本
+- [x] Markdown 动作识别列表与链接；结果窗主按钮样式；右键取消框选
+- [x] 版本号统一为 0.2.1；GitHub Actions 跑 pytest
+
 ## v0.3（剩余部分）
 - [ ] LLM provider 具体实现（用户显式配置后接入；无则保持优雅降级）
 - [ ] Provider 超时 / 重试 / 取消

@@ -15,13 +15,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QRect
 from PySide6.QtGui import QImage
-
-if TYPE_CHECKING:
-    from ..ocr.base import OcrResult
 
 
 @dataclass

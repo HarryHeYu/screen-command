@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import QBuffer, QByteArray, QRect
+from PySide6.QtCore import QBuffer, QRect
 from PySide6.QtGui import QGuiApplication, QPixmap, QScreen
 
 from .logutil import Timer, get_logger

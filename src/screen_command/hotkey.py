@@ -109,6 +109,10 @@ class GlobalHotkeyThread(threading.Thread):
             user32.UnregisterHotKey(None, hotkey_id)
         log.info("hotkey: unregistered %d combo(s)", len(self._callbacks))
 
+    def wait_ready(self, timeout: float = 2.0) -> bool:
+        """阻塞直到热键注册完成（成功或全部失败）。超时返回 False。"""
+        return self._ready.wait(timeout)
+
     def stop(self) -> None:
         self.stop_event.set()
         if self._thread_id:

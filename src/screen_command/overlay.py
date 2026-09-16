@@ -1,7 +1,7 @@
 """Selection Overlay：每块屏幕一个全屏窗口，背景为冻结的屏幕快照 + 暗色蒙层。
 
 - 拖拽出选区：选区内显示原始亮度，外部压暗；边框 + 物理像素尺寸提示。
-- Esc 取消；点击（无拖动）/ 零尺寸选择视为取消。
+- Esc / 右键 / 点击（无拖动）/ 零尺寸选择视为取消。
 - 选区以全局逻辑坐标上报，裁剪换算由 CaptureCore 负责。
 """
 
@@ -51,6 +51,10 @@ class OverlayWindow(QWidget):
     # -- events ------------------------------------------------------------
 
     def mousePressEvent(self, ev: QMouseEvent) -> None:
+        if ev.button() == Qt.MouseButton.RightButton:
+            self._dragging = False
+            self.cancelled.emit()
+            return
         if ev.button() == Qt.MouseButton.LeftButton:
             self._origin = ev.position().toPoint()
             self._current = self._origin

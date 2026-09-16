@@ -85,10 +85,13 @@ def _cmd_providers(_args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from . import __version__
+
     parser = argparse.ArgumentParser(
         prog="screen_command",
         description="框选屏幕区域 → 识别内容 → 直接执行动作。",
     )
+    parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_run = sub.add_parser("run", help="启动 GUI（热键框选，默认 Alt+W）")

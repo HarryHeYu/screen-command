@@ -84,6 +84,7 @@ class AppController(QObject):
         self._current_action: Action | None = None
         self._result_win: ResultWindow | None = None
         self._active_signals: _JobSignals | None = None
+        self._job_gen = 0  # 丢弃取消/重入后迟到的旧任务结果
 
         self.status = StatusWindow()
         self._capture_combo = "alt+w"        # run() 里被 config.toml 的实际值覆盖
@@ -109,26 +110,14 @@ class AppController(QObject):
         hotkeys = load_hotkeys()
         self._capture_combo = hotkeys.capture
         self._quick_combo = hotkeys.quick_ocr
-        self.status.set_hotkey_labels(hotkeys.capture, hotkeys.quick_ocr)
         self._hotkey = GlobalHotkeyThread({
             hotkeys.capture: self._hotkey_bridge.triggered.emit,
             hotkeys.quick_ocr: self._quick_bridge.triggered.emit,
         })
         self._hotkey.start()
-        self._watch_hotkey()
-
-    def _watch_hotkey(self) -> None:
-        from PySide6.QtCore import QTimer
-
-        def check() -> None:
-            if self._hotkey and self._hotkey.ok:
-                self.status.set_hotkey_ok(True)
-            elif self._hotkey and not self._hotkey.is_alive():
-                self.status.set_hotkey_ok(False)
-            else:
-                QTimer.singleShot(300, check)
-
-        QTimer.singleShot(300, check)
+        ready = self._hotkey.wait_ready(2.0)
+        registered = self._hotkey.registered_combos if ready else set()
+        self.status.set_hotkey_status(registered, hotkeys.capture, hotkeys.quick_ocr)
 
     def shutdown(self) -> None:
         self._cancel_all()
@@ -276,31 +265,39 @@ class AppController(QObject):
         self._ctx.cancel_token = threading.Event()
         ctx = self._ctx
 
-        self.state = PROCESSING
+        self._job_gen += 1
+        gen = self._job_gen
         self.status.set_processing(True)
         signals = _JobSignals()
         # 主线程持引用：防止 worker 线程结束时 signals 被析构、queued 信号丢失
         # （否则状态机会间歇性卡死在 PROCESSING，P1-2）
         self._active_signals = signals
-        signals.done.connect(self._on_action_done)
+        signals.done.connect(lambda result, g=gen: self._on_action_done(result, g))
         self._pool.start(
             _ActionJob(lambda: action.execute(ctx), signals, action.id)
         )
 
     def _cancel_processing(self) -> None:
-        """用户取消执行中的动作：丢弃排队任务并回 Idle；迟到的结果被状态守卫丢弃。"""
+        """用户取消执行中的动作：丢弃排队任务并回 Idle；迟到的结果被代数/状态守卫丢弃。"""
         if self.state != PROCESSING:
             return
         if self._ctx is not None and isinstance(self._ctx.cancel_token, threading.Event):
             self._ctx.cancel_token.set()
         self._pool.clear()  # 清掉尚未启动的排队 job；运行中的 job 无法强杀
+        self._job_gen += 1
         self._active_signals = None
         self.state = IDLE
         self.status.set_processing(False)
         self.status.set_status("已取消 — 按热键重新框选")
         log.info("state: idle (action cancelled by user)")
 
-    def _on_action_done(self, result: ActionResult) -> None:
+    def _on_action_done(self, result: ActionResult, gen: int | None = None) -> None:
+        if gen is not None and gen != self._job_gen:
+            log.info(
+                "action %s: drop stale result (gen %s != %s)",
+                result.action_id, gen, self._job_gen,
+            )
+            return
         self._active_signals = None
         self.status.set_processing(False)
         log.info(

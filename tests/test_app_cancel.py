@@ -60,3 +60,13 @@ class TestCancelProcessing:
         controller.start_quick_capture()
         assert controller._pending_quick is False
         assert controller.state == PROCESSING
+
+    def test_stale_generation_dropped_while_processing(self, controller):
+        """取消后再开新任务时，旧 job 的迟到结果不得覆盖新任务。"""
+        from screen_command.app import PROCESSING
+
+        controller.state = PROCESSING
+        controller._job_gen = 5
+        controller._on_action_done(ActionResult("ocr", ok=True, text="old"), gen=4)
+        assert controller.state == PROCESSING
+        assert controller._result_win is None

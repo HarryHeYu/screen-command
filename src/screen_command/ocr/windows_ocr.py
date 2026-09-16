@@ -173,7 +173,6 @@ class WindowsOcrProvider(OCRProvider):
         )
 
     async def _recognize_async(self, image_png: bytes, language: str | None):
-        from winrt.windows.globalization import Language
         from winrt.windows.graphics.imaging import (
             BitmapDecoder,
             BitmapPixelFormat,
@@ -182,7 +181,7 @@ class WindowsOcrProvider(OCRProvider):
         from winrt.windows.media.ocr import OcrEngine
         from winrt.windows.storage.streams import DataWriter, InMemoryRandomAccessStream
 
-        engine = self._engine_for(language)
+        engine = self._engine_for(language or self._preferred)
         assert isinstance(engine, OcrEngine)
 
         stream = InMemoryRandomAccessStream()
@@ -199,7 +198,5 @@ class WindowsOcrProvider(OCRProvider):
 
         ocr = await engine.recognize_async(bitmap)
         lang = engine.recognizer_language.language_tag
-        if self._preferred:
-            lang = f"{lang} (requested {self._preferred})"
         lines = _lines_with_indent(ocr)
         return ocr.text, lines, lang, bitmap.pixel_width, bitmap.pixel_height

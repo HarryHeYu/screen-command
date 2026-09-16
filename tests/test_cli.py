@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from screen_command import __version__
 from screen_command.__main__ import main
 
 
@@ -44,3 +47,10 @@ def test_providers_command(capsys):
     out = capsys.readouterr()
     assert rc == 0
     assert "windows" in out.out and "mock" in out.out
+
+
+def test_version_flag(capsys):
+    with pytest.raises(SystemExit) as ei:
+        main(["--version"])
+    assert ei.value.code == 0
+    assert __version__ in capsys.readouterr().out

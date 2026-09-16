@@ -43,6 +43,19 @@ class TestProviderFactory:
             make_provider("no-such-provider")
 
 
+def test_windows_provider_uses_constructor_language():
+    """CLI --language / 构造参数必须真正选引擎，不能只写进结果标签。"""
+    from screen_command.ocr.windows_ocr import WindowsOcrProvider
+
+    class Stub(WindowsOcrProvider):
+        async def _recognize_async(self, image_png, language):
+            chosen = language or self._preferred
+            raise OcrError(f"chosen:{chosen}")
+
+    with pytest.raises(OcrError, match="chosen:en-US"):
+        Stub(language="en-US").recognize(b"x")
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows OCR only")
 class TestWindowsOcrIntegration:
     """真实识别测试 —— 依赖系统 en-US / zh-Hans-CN 语言包（本机已确认）。"""

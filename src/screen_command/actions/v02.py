@@ -138,6 +138,21 @@ class CodeOCRAction(Action):
 # ---------------------------------------------------------------- markdown
 
 _CODEY_LINE = re.compile(r"[{};=]|^\s{4,}|^\s*(def |class |import |from |return )")
+_LIST_ITEM = re.compile(r"^\s*(?:([-*•])|(\d+)[.)])\s+(.*\S.*)$")
+_URL = re.compile(r"(https?://[^\s<>]+)")
+
+
+def _linkify(text: str) -> str:
+    return _URL.sub(r"[\1](\1)", text)
+
+
+def _normalize_list_item(line: str) -> str:
+    m = _LIST_ITEM.match(line)
+    if not m:
+        return line.strip()
+    if m.group(2):
+        return f"{m.group(2)}. {m.group(3).strip()}"
+    return f"- {m.group(3).strip()}"
 
 
 class MarkdownAction(Action):
@@ -161,7 +176,7 @@ class MarkdownAction(Action):
 
         def flush_paragraph() -> None:
             if buf:
-                md_parts.append(" ".join(s.strip() for s in buf))
+                md_parts.append(_linkify(" ".join(s.strip() for s in buf)))
                 buf.clear()
 
         code_buf: list[str] = []
@@ -174,20 +189,35 @@ class MarkdownAction(Action):
                 code_buf.clear()
             in_code = False
 
+        list_buf: list[str] = []
+
+        def flush_list() -> None:
+            if list_buf:
+                md_parts.append("\n".join(list_buf))
+                list_buf.clear()
+
         for line in lines:
-            if _CODEY_LINE.search(line):
+            if _LIST_ITEM.match(line):
+                if in_code:
+                    flush_code()
+                flush_paragraph()
+                list_buf.append(_normalize_list_item(line))
+            elif _CODEY_LINE.search(line):
+                flush_paragraph()
+                flush_list()
                 if not in_code:
-                    flush_paragraph()
                     in_code = True
                 code_buf.append(line)
             else:
                 if in_code:
                     flush_code()
+                flush_list()
                 if not line.strip():
                     flush_paragraph()
                 else:
                     buf.append(line)
         flush_code()
+        flush_list()
         flush_paragraph()
         md = "\n\n".join(p for p in md_parts if p.strip())
         return ActionResult(
@@ -330,7 +360,11 @@ class ExplainErrorAction(Action):
         (re.compile(r"merge conflict|CONFLICT", re.I),
          "合并/变基时存在未解决的冲突。",
          "编辑冲突文件后 `git add` 并 `git commit`，或用 `git merge --abort` 回退。"),
-        (re.compile(r"rejected.*non-fast-forward|fetch first", re.I),
+        (re.compile(
+            r"rejected.*non-fast-forward|fetch first|failed to push some refs|"
+            r"Updates were rejected|\[rejected\]",
+            re.I,
+         ),
          "远程包含本地没有的提交，推送被拒绝。",
          "先 `git pull --rebase`（或 `git pull`）合并远程改动后再推送。"),
         (re.compile(r"pathspec .* did not match", re.I),

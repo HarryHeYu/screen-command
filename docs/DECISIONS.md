@@ -136,6 +136,23 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 本机实测空闲。同时把组合键做成 `config.toml [hotkey]` 可配置——
 再次撞车时用户改配置即可。热键注册失败仍优雅降级（Capture 按钮兜底）。
 
+## D13. config.toml 查找路径：cwd / 仓库根，而不是 src/
+
+**日期**: 2026-09-16
+
+`config.py` 位于 `src/screen_command/config.py`。原先 `Path(__file__).parent.parent`
+解析到 `src/`，用户按文档把 `config.toml` 放在项目根时永远不会被读到。
+改为：`SCREEN_COMMAND_CONFIG` → 当前工作目录已存在的 `config.toml` → 仓库根
+（`parents[2]`，且要求该目录有 `pyproject.toml` 或 `config.example.toml`）。
+
+## D14. 后台任务用代数丢弃迟到结果
+
+**日期**: 2026-09-16
+
+仅靠 `state != PROCESSING` 守卫不够：用户取消后再立即开新动作时，旧
+`_ActionJob` 的 queued 信号仍连在 `_on_action_done` 上，会把旧结果当成新结果展示。
+每次派发/取消递增 `_job_gen`，槽函数核对该代数。
+
 ## 顺序调整记录
 
 - 2026-09-13: OCR polish（D8 CJK 规整）自 v0.2 提前 —— 属于第一阶段「OCR 结果基本正确」验收范畴。

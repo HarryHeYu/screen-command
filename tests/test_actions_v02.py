@@ -121,6 +121,23 @@ class TestMarkdownAction:
         r = MarkdownAction(MockOcrProvider()).execute(ActionContext(image_png=b"i"))
         assert "只有一段 普通文字。" in r.markdown or "只有一段" in r.markdown
 
+    def test_lists_and_links(self, provider, monkeypatch):
+        monkeypatch.setattr(
+            MockOcrProvider, "recognize",
+            lambda self, png, language=None: _ocr_lines(
+                "参考文档 https://example.com/docs",
+                "- 第一项",
+                "* 第二项",
+                "1. 第三项",
+            ),
+        )
+        r = MarkdownAction(MockOcrProvider()).execute(ActionContext(image_png=b"i"))
+        assert r.ok
+        assert "[https://example.com/docs](https://example.com/docs)" in r.markdown
+        assert "- 第一项" in r.markdown
+        assert "- 第二项" in r.markdown
+        assert "1. 第三项" in r.markdown
+
 
 class TestExplainErrorAction:
     def test_python_traceback_analysis(self, provider, monkeypatch):
@@ -218,7 +235,7 @@ class TestExplainSpecializedRules:
             "git push origin main",
             "fatal: failed to push some refs (hint: Updates were rejected because the tip of your branch is behind)",
         )
-        assert "推送被拒绝" in md or "rejected" in md.lower()
+        assert "推送被拒绝" in md
 
     def test_node_cannot_find_module(self, monkeypatch):
         md = self._explain(

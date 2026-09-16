@@ -9,12 +9,10 @@
 
 from __future__ import annotations
 
+import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = PROJECT_ROOT / "config.toml"
 
 DEFAULT_CAPTURE_HOTKEY = "alt+w"
 DEFAULT_QUICK_OCR_HOTKEY = "alt+x"
@@ -26,12 +24,53 @@ class HotkeyConfig:
     quick_ocr: str = DEFAULT_QUICK_OCR_HOTKEY
 
 
+def _repo_root() -> Path | None:
+    """开发安装时定位仓库根（含 pyproject.toml 的目录）。
+
+    本文件位于 ``<root>/src/screen_command/config.py``，所以 ``parents[2]``
+    是仓库根；wheel 安装到 site-packages 时该路径无效，返回 None。
+    """
+    here = Path(__file__).resolve()
+    try:
+        root = here.parents[2]
+    except IndexError:
+        return None
+    if (root / "pyproject.toml").is_file() or (root / "config.example.toml").is_file():
+        return root
+    return None
+
+
+def resolve_config_path(explicit: Path | None = None) -> Path:
+    """解析 config.toml 路径，不要求文件一定存在。
+
+    优先级：显式参数 → ``SCREEN_COMMAND_CONFIG`` → 当前工作目录中已存在的
+    ``config.toml`` → 仓库根 ``config.toml`` → 回退为 ``<cwd>/config.toml``。
+    """
+    if explicit is not None:
+        return explicit
+    env = os.environ.get("SCREEN_COMMAND_CONFIG")
+    if env:
+        return Path(env)
+    cwd_cfg = Path.cwd() / "config.toml"
+    if cwd_cfg.is_file():
+        return cwd_cfg
+    root = _repo_root()
+    if root is not None:
+        return root / "config.toml"
+    return cwd_cfg
+
+
+# 兼容旧引用：指向仓库根（或 cwd），不再误指向 src/
+PROJECT_ROOT = _repo_root() or Path.cwd()
+CONFIG_PATH = PROJECT_ROOT / "config.toml"
+
+
 def load_hotkeys(path: Path | None = None) -> HotkeyConfig:
     """读取 config.toml 的 [hotkey] 段（可缺省）。非法值回退默认并告警。"""
     from .hotkey import parse_combo
 
     cfg = HotkeyConfig()
-    p = path or CONFIG_PATH
+    p = resolve_config_path(path)
     if not p.exists():
         return cfg
     try:

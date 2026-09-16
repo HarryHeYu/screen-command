@@ -78,12 +78,14 @@ UI 只消费 `text/markdown`，复制/保存按 type 分发 —— 不允许 act
 ## 线程模型
 
 - Qt 主线程：所有 UI。
-- OCR / 未来网络 action：`QThreadPool` / worker 线程，结果经 signal 回主线程；协作式取消为 v0.3 计划（cancel_token 已预留，当前恒为 None）。
+- OCR / 未来网络 action：`QThreadPool` / worker 线程，结果经 signal 回主线程。
+  协作式 `cancel_token` 已接入；本地 OCR 不可强杀，取消语义为丢弃结果。
+  每个任务带代数（`_job_gen`），取消或重入后迟到的旧结果会被丢弃。
 - 热键：独立 Win32 线程（消息循环），触发后经 Qt Signal 桥（queued connection）回主线程。
 
 ## DPI 与多显示器
 
 - 进程 per-monitor DPI aware（Qt6 默认）。
-- 每个物理屏一个 OverlayWindow，窗口 geometry = 该屏 availGeometry，
-  内部把屏幕逻辑坐标 ↔ 快照物理像素转换封装在 `ScreenMapping`。
+- 每个物理屏一个 OverlayWindow，窗口 geometry = 该屏 `QScreen.geometry()`
+  （覆盖任务栏，避免漏出可点区域）；坐标换算按 `devicePixelRatio` 做逻辑像素 ↔ 物理像素。
 - 选区统一以**全局逻辑坐标**表示，裁剪时换算到目标屏物理像素。

@@ -23,7 +23,7 @@ QTextEdit#rText {
     background: #23262d; color: #e8e8ea; border: 1px solid #33383f;
     border-radius: 6px; padding: 8px; font-size: 13px; selection-background-color: #2d5a8c;
 }
-QPushButton#rBtn {
+QPushButton#rBtn, QPushButton#rPrimary {
     background: #2c3038; color: #e8e8ea; border: none; border-radius: 6px;
     padding: 6px 16px; font-size: 12px;
 }
@@ -65,7 +65,7 @@ class ResultWindow(QWidget):
         btns = QHBoxLayout()
         btns.setSpacing(8)
         self._btn_copy = QPushButton("复制")
-        self._btn_copy.setObjectName("rBtn rPrimary")
+        self._btn_copy.setObjectName("rPrimary")
         self._btn_edit = QPushButton("编辑")
         self._btn_edit.setObjectName("rBtn")
         self._btn_retry = QPushButton("重试")
@@ -112,8 +112,9 @@ class ResultWindow(QWidget):
         else:
             self._text.setPlainText(f"动作执行失败：\n\n{result.error}")
             self._meta.setText(result.action_id)
-        # 失败结果没有可复制的产出 —— 避免把错误文案复制走
+        # 失败结果没有可复制/可编辑的产出 —— 避免把错误文案当正文处理
         self._btn_copy.setEnabled(result.ok)
+        self._btn_edit.setEnabled(result.ok)
         self._text.setReadOnly(True)
         self._btn_edit.setText("编辑")
         self.show()

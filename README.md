@@ -24,8 +24,9 @@ cd screen-command
 python -m venv .venv
 .venv\Scripts\python -m pip install -e .
 
-# Run
+# Run (either form works after the editable install)
 .venv\Scripts\python -m screen_command run
+.venv\Scripts\screen_command run
 ```
 
 After the app starts, press `Alt+W` to start a capture, or click the Capture button in the status window. Hotkeys are registered at process lifetime only — the app leaves no persistent changes behind. If a hotkey is taken by another program, registration fails with a visible hint and the Capture button still works.
@@ -33,7 +34,7 @@ After the app starts, press `Alt+W` to start a capture, or click the Capture but
 ## Usage
 
 1. **Launch**: run `.venv\Scripts\python -m screen_command run`. A small always-on-top status window appears.
-2. **Capture**: press `Alt+W` (or click the Capture button). The screen dims and freezes; hold the left mouse button and drag a rectangle, release to confirm. The selected area returns to full brightness and shows its pixel size while dragging. Press `Esc` or click without dragging to cancel at any time.
+2. **Capture**: press `Alt+W` (or click the Capture button). The screen dims and freezes; hold the left mouse button and drag a rectangle, release to confirm. The selected area returns to full brightness and shows its pixel size while dragging. Press `Esc`, right-click, or click without dragging to cancel at any time.
 3. **Pick an action**: the action menu pops up next to your selection — click an entry or press its number key:
 
    | Key | Action | What it does |
@@ -66,7 +67,7 @@ screen_command process <img> --action ocr|copy_text|translate|code|markdown|expl
 | `Alt+W` | Select a screen region, then pick an action |
 | `Alt+X` | Select → OCR → copy to clipboard |
 
-Hotkeys can be changed in `config.toml` (see `config.example.toml`). If a combination is already taken by an input method, media player, or another resident app, simply pick a different one there.
+Hotkeys can be changed in `config.toml` at the project root (see `config.example.toml`). The app looks for that file in `SCREEN_COMMAND_CONFIG`, then the current working directory, then the repo root. If a combination is already taken by an input method, media player, or another resident app, simply pick a different one there.
 
 ## Tests
 
