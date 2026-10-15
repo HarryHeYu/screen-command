@@ -1,7 +1,7 @@
 """生成确定性 OCR 测试图片（tests/fixtures/*.png）。
 
-用 Pillow 绘制固定文字，覆盖第一阶段的测试矩阵：
-英文 / 中文 / 混合 / 终端报错（深底）/ 代码 / 小字。
+用 Pillow 绘制固定文字，覆盖测试矩阵：
+英文 / 中文 / 混合 / 终端报错（深底）/ 代码 / 小字 / 表格 / 公式。
 运行 pytest 时由 conftest 自动确保存在。
 """
 
@@ -25,10 +25,13 @@ def _draw(
     lines: list[tuple[str, ImageFont.FreeTypeFont, str]],
     bg: str,
     *,
+    force: bool = False,
     width: int = 900,
     line_gap: int = 10,
 ) -> None:
-    """按 (text, font, color) 列表绘制左对齐文本块。"""
+    """按 (text, font, color) 列表绘制左对齐文本块（已存在且非 force 时跳过）。"""
+    if path.exists() and not force:
+        return
     ascent_pad = 18
     total_h = sum(f.size + line_gap for _, f, _ in lines) + ascent_pad * 2
     img = Image.new("RGB", (width, total_h), bg)
@@ -49,9 +52,12 @@ def generate_all(force: bool = False) -> dict[str, Path]:
         out[name] = p
         return p
 
+    def draw(path: Path, lines, bg: str, **kw) -> None:
+        _draw(path, lines, bg, force=force, **kw)
+
     # 1. 英文段落（浅底深字）
     arial24 = _font("arial.ttf", 24)
-    _draw(
+    draw(
         dest("en_paragraph.png"),
         [
             ("The quick brown fox jumps over the lazy dog.", arial24, "#1a1a1a"),
@@ -63,7 +69,7 @@ def generate_all(force: bool = False) -> dict[str, Path]:
 
     # 2. 中文段落（浅底深字，微软雅黑）
     msyh24 = _font("msyh.ttc", 24)
-    _draw(
+    draw(
         dest("zh_paragraph.png"),
         [
             ("机器学习是人工智能的一个分支。", msyh24, "#111111"),
@@ -74,7 +80,7 @@ def generate_all(force: bool = False) -> dict[str, Path]:
     )
 
     # 3. 中英混合
-    _draw(
+    draw(
         dest("mixed.png"),
         [
             ("使用 Python 实现 neural network 训练", msyh24, "#202020"),
@@ -86,7 +92,7 @@ def generate_all(force: bool = False) -> dict[str, Path]:
 
     # 4. 终端报错（深底浅字，等宽）— 深色背景用例
     consol20 = _font("consola.ttf", 20)
-    _draw(
+    draw(
         dest("terminal_error.png"),
         [
             ("Traceback (most recent call last):", consol20, "#cccccc"),
@@ -98,7 +104,7 @@ def generate_all(force: bool = False) -> dict[str, Path]:
     )
 
     # 5. 代码（浅底，等宽，带缩进）
-    _draw(
+    draw(
         dest("code.png"),
         [
             ("def train(model, loader):", consol20, "#0b0b0b"),
@@ -112,7 +118,7 @@ def generate_all(force: bool = False) -> dict[str, Path]:
 
     # 6. 小字号文本（12px 左右）
     small = _font("arial.ttf", 12)
-    _draw(
+    draw(
         dest("small_text.png"),
         [
             ("tiny but readable annotation at 12px", small, "#333333"),
@@ -122,9 +128,33 @@ def generate_all(force: bool = False) -> dict[str, Path]:
         width=520,
     )
 
-    for p in out.values():
-        if force or not p.exists():
-            continue
+    # 7. 表格（等宽、字号偏大，列间用多个空格分隔）— 表格动作的候选目标
+    consol28 = _font("consola.ttf", 28)
+    draw(
+        dest("table.png"),
+        [
+            ("Name      Qty    Price", consol28, "#111111"),
+            ("Apple     3      120", consol28, "#111111"),
+            ("Banana    12     50", consol28, "#111111"),
+            ("Cherry    7      400", consol28, "#111111"),
+        ],
+        "#ffffff",
+        line_gap=18,
+    )
+
+    # 8. 公式（用插入符 ^ 写幂，便于 OCR；含希腊字母）— 公式动作的候选目标
+    arial32 = _font("arial.ttf", 32)
+    draw(
+        dest("formula.png"),
+        [
+            ("E = m c^2", arial32, "#111111"),
+            ("a^2 + b^2 = c^2", arial32, "#111111"),
+            ("x_i <= y + 1", arial32, "#111111"),
+        ],
+        "#ffffff",
+        line_gap=16,
+    )
+
     return out
 
 
@@ -139,9 +169,11 @@ def ensure_fixtures() -> dict[str, Path]:
             "terminal_error.png",
             "code.png",
             "small_text.png",
+            "table.png",
+            "formula.png",
         ]
     ):
-        return generate_all(force=True)
+        return generate_all()  # 只补缺失的，不覆盖已有 fixture
     return {p.name: p for p in FIXTURES.glob("*.png") if not p.name.startswith("_")}
 
 

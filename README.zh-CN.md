@@ -12,6 +12,8 @@
 - **本地 OCR**：使用 Windows 内置 OCR 引擎（Windows.Media.Ocr），支持中英文，完全本地运行，无需联网。
 - **动作系统**：识别文字（OCR）、复制文字、翻译、提取代码、转 Markdown、解释错误、保存截图，通过框选后的浮动菜单选择，数字键直选。
 - **解释错误**：对报错输出做离线规则分析（Python traceback、CUDA OOM、git、Node.js、MSVC/MinGW、shell 错误），可选接入 LLM 增强。
+- **公式转 LaTeX**：把 OCR 文本中的 Unicode 数学符号、上下标、希腊字母映射为 LaTeX，并转义特殊字符。
+- **表格转 Markdown / CSV / JSON**：用词的包围盒重建表格（列对齐在 OCR 折叠空白后依然可用），并给出三种格式。
 - **Quick Action**：`Alt+X` 框选后直接 OCR 并复制到剪贴板，不弹菜单。
 - **测试 harness**：CLI 可对图片文件直接执行任意动作，自动化测试无需真实屏幕。
 
@@ -46,8 +48,10 @@ python -m venv .venv
    | 5 | 转 Markdown | 按列表/链接/段落结构化 |
    | 6 | 解释错误 | 分析报错输出（本地规则，无需联网） |
    | 7 | 保存截图 | 把框选区域存为 PNG（唯一会写文件的动作） |
+   | 8 | 公式转 LaTeX | 数学符号 / 上下标 / 希腊字母 → LaTeX |
+   | 9 | 表格转 Markdown | 重建表格，输出 Markdown / CSV / JSON（结果窗内切换） |
 
-4. **查看结果**：动作在后台执行，完成后弹出结果窗口——文本可选中，按钮有**复制**（写入剪贴板）、**编辑**（改为可编辑以便修改后再复制）、**重试**（重跑同一动作）、**其他动作**（对同一块选区换个动作，无需重新框选）、**关闭**。执行过程中状态窗口会出现"取消当前动作"按钮。
+4. **查看结果**：动作在后台执行，完成后弹出结果窗口——文本可选中，按钮有**复制**（写入剪贴板）、**编辑**（改为可编辑以便修改后再复制）、**重试**（重跑同一动作）、**其他动作**（对同一块选区换个动作，无需重新框选）、**关闭**。执行过程中状态窗口会出现"取消当前动作"按钮。当动作有多种格式（如表格的 Markdown / CSV / JSON）时，元信息旁会出现格式下拉，**复制**复制当前显示的格式。
 5. **快捷路径**：`Alt+X` 跳过菜单——框选后自动 OCR 并把结果复制到剪贴板，适合高频的"复制屏幕文字"场景。
 
 ## CLI
@@ -55,10 +59,13 @@ python -m venv .venv
 ```bash
 screen_command run            # 启动 GUI
 screen_command providers      # 查看可用 OCR provider 与语言包
-screen_command process <img> --action ocr|copy_text|translate|code|markdown|explain|save_image
+screen_command process <img> --action ocr|copy_text|translate|code|markdown|explain|formula|table|save_image
     [--provider auto|windows|mock] [--language zh-Hans-CN]
-    [--output result.txt] [--md] [--opt KEY VALUE ...]
+    [--output result.txt] [--md] [--format Markdown|CSV|JSON]
+    [--opt KEY VALUE ...]
 ```
+
+`--format` 用于选择多格式结果中的某一种（表格：`Markdown` / `CSV` / `JSON`；公式：`LaTeX` / `LaTeX（显示式）`）；`--md` 在动作有 Markdown 视图时输出该视图。
 
 ## 快捷键
 
@@ -80,7 +87,9 @@ screen_command process <img> --action ocr|copy_text|translate|code|markdown|expl
 
 ## 质量预期
 
-翻译、提取代码、转 Markdown、解释错误均以 OCR 原始识别质量为上限，规则后处理（缩进重建、全角归一、行号剥离）不做字符纠错。深色终端小号等宽字体存在典型混淆（`l↔1`、`O↔0`），识别要求高的场景建议框选更大区域、避开小字号和低对比度内容。选区跨多块屏幕时，按选区中心所在屏幕裁剪。
+翻译、提取代码、转 Markdown、解释错误、公式转 LaTeX、表格提取均以 OCR 原始识别质量为上限，规则后处理（缩进重建、全角归一、行号剥离、符号映射、列重建）不做字符纠错。深色终端小号等宽字体存在典型混淆（`l↔1`、`O↔0`），识别要求高的场景建议框选更大区域、避开小字号和低对比度内容。选区跨多块屏幕时，按选区中心所在屏幕裁剪。
+
+表格提取使用每个词的包围盒，因此即使 Windows OCR 把列间空白折叠，也能按几何位置还原列；英文（`en-US`）引擎对 ASCII 表格的识别通常优于中文引擎，命令行处理表格时可用 `--language en-US`。公式转 LaTeX 是尽力而为的文本转换，不是数学排版引擎。
 
 ## 隐私
 

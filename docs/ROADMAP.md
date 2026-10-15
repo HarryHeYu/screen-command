@@ -27,7 +27,7 @@
 - [x] Action keyboard shortcuts（菜单数字键 1–7）
 - [x] Explain Error（提前自 v0.3：离线规则分析可用，LLM 仅是可选增强 hook）
 - [x] LLMProvider / TranslationProvider 抽象（提前自 v0.3 的 provider abstraction 部分）
-- [x] Quick Actions（提前自 v0.5：`Ctrl+Shift+1` = 框选→OCR→复制，多热键支持）
+- [x] Quick Actions（提前自 v0.5：`Alt+X` = 框选→OCR→复制，多热键支持）
 
 ## v0.2.1 — 稳定性与可用性（已完成 2026-09-16）
 - [x] `config.toml` 从项目根 / cwd / `SCREEN_COMMAND_CONFIG` 加载（不再误读 `src/config.toml`）
@@ -43,9 +43,13 @@
 - [ ] Provider 超时 / 重试 / 取消
 - [ ] Translate 的首个具体 provider 实现
 
-## v0.4
-- [ ] Formula → LaTeX（接口 + UI 先行）
-- [ ] Table → Markdown / CSV / JSON
+## v0.4 — 离线新动作（已完成 2026-10-15）
+- [x] Formula → LaTeX（离线规则：Unicode 数学符号 / 上下标 / 希腊字母映射 + 特殊字符转义）
+- [x] Table → Markdown / CSV / JSON（基于词包围盒的行列重建，抗 OCR 折叠空白）
+- [x] 结果窗多格式切换（`data["formats"]`）+ CLI `--format`
+- [x] 顺带修复：缩进重建与表格提取此前因 winrt `Rect` 字段名（小写 `x/y/width/height`）静默失效
+- [x] 顺带修复：CLI 在 GBK 控制台打印非 ASCII 文本会崩溃 → stdout/stderr 切 UTF-8
+- [x] 版本号统一为 0.4.0；补版本一致性测试
 
 ## v0.5（剩余部分）
 - [ ] History（optional，默认考虑隐私）

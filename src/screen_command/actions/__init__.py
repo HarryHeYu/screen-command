@@ -13,6 +13,7 @@ from .base import (
 )
 from .builtin import CopyTextAction, OCRAction, SaveImageAction
 from .v02 import CodeOCRAction, ExplainErrorAction, MarkdownAction, TranslateAction
+from .v04 import FormulaToLatexAction, TableToMarkdownAction
 
 __all__ = [
     "Action",
@@ -29,10 +30,13 @@ __all__ = [
     "CodeOCRAction",
     "MarkdownAction",
     "ExplainErrorAction",
+    "FormulaToLatexAction",
+    "TableToMarkdownAction",
 ]
 
 # 动作 id → 构造方式（provider 注入需求不同）
-PROVIDER_BASED = {"ocr", "copy_text", "translate", "code", "markdown", "explain"}
+PROVIDER_BASED = {"ocr", "copy_text", "translate", "code", "markdown", "explain",
+                  "formula", "table"}
 
 
 def build_default_actions(
@@ -40,7 +44,7 @@ def build_default_actions(
     translation_provider=None,
     llm_provider=None,
 ) -> list[Action]:
-    """构造 v0.2 默认动作集（菜单顺序即快捷键顺序），并写入注册表。"""
+    """构造默认动作集（菜单顺序即快捷键顺序），并写入注册表。"""
     actions = [
         OCRAction(ocr_provider),
         CopyTextAction(ocr_provider),
@@ -49,6 +53,8 @@ def build_default_actions(
         MarkdownAction(ocr_provider),
         ExplainErrorAction(ocr_provider, llm_provider),
         SaveImageAction(),
+        FormulaToLatexAction(ocr_provider),
+        TableToMarkdownAction(ocr_provider),
     ]
     for a in actions:
         register_action(a)
@@ -67,6 +73,8 @@ def build_action_by_id(action_id: str, ocr_provider, translation_provider=None,
         "code": lambda: CodeOCRAction(ocr_provider),
         "markdown": lambda: MarkdownAction(ocr_provider),
         "explain": lambda: ExplainErrorAction(ocr_provider, llm_provider),
+        "formula": lambda: FormulaToLatexAction(ocr_provider),
+        "table": lambda: TableToMarkdownAction(ocr_provider),
     }
     if action_id not in makers:
         raise KeyError(f"unknown action: {action_id!r}")

@@ -103,12 +103,12 @@ zh-Hans 引擎输出有两个特性：汉字之间插入空格（"机 器 学 �
   翻译/LLM 必然涉及联网或付费 API，违反默认 local-first；任何具体实现必须由用户
   显式配置并看到「数据将发送到 X」的提示后才允许接入。无 provider 时 action
   返回明确的降级错误，不隐藏、不静默联网。
-- **Quick Actions（Ctrl+Shift+1 → 框选→OCR→复制）从 v0.5 提前**：多热键支持
+- **Quick Actions（Alt+X → 框选→OCR→复制）从 v0.5 提前**：多热键支持
   是热键线程的一次小改动，成本极低而日常价值高。
 - 真实 OCR 的多行 traceback 常被合并成单行 —— Explain 解析必须用行内 search
   而非整行 match（测试 `test_merged_single_line_traceback` 锁定该行为）。
 
-## D10. 开发控制面板：StatusWindow 而非系统托盘
+## D11. 开发控制面板：StatusWindow 而非系统托盘
 
 **日期**: 2026-09-13
 
@@ -116,7 +116,7 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 托盘需要额外依赖与更复杂的事件处理，且状态提示（如热键注册失败）更显眼；
 打包为正式产品时再评估托盘化。
 
-## D11. 热键线程：阻塞 GetMessage 而非 Peek+Sleep 轮询
+## D12. 热键线程：阻塞 GetMessage 而非 Peek+Sleep 轮询
 
 **日期**: 2026-09-13（代码审查后改进）
 
@@ -124,7 +124,7 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 改为阻塞 `GetMessageW`，`stop()` 用 `PostThreadMessage(WM_QUIT)` 唤醒退出：
 触发零延迟、零功耗，停止语义也更直接。
 
-## D12. 默认热键：Alt+W / Alt+X，并支持 config.toml 覆盖
+## D13. 默认热键：Alt+W / Alt+X，并支持 config.toml 覆盖
 
 **日期**: 2026-09-13
 
@@ -136,7 +136,7 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 本机实测空闲。同时把组合键做成 `config.toml [hotkey]` 可配置——
 再次撞车时用户改配置即可。热键注册失败仍优雅降级（Capture 按钮兜底）。
 
-## D13. config.toml 查找路径：cwd / 仓库根，而不是 src/
+## D14. config.toml 查找路径：cwd / 仓库根，而不是 src/
 
 **日期**: 2026-09-16
 
@@ -145,7 +145,7 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 改为：`SCREEN_COMMAND_CONFIG` → 当前工作目录已存在的 `config.toml` → 仓库根
 （`parents[2]`，且要求该目录有 `pyproject.toml` 或 `config.example.toml`）。
 
-## D14. 后台任务用代数丢弃迟到结果
+## D15. 后台任务用代数丢弃迟到结果
 
 **日期**: 2026-09-16
 
@@ -153,7 +153,27 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 `_ActionJob` 的 queued 信号仍连在 `_on_action_done` 上，会把旧结果当成新结果展示。
 每次派发/取消递增 `_job_gen`，槽函数核对该代数。
 
+## D16. v0.4 离线新动作与两处静默失效的修复
+
+**日期**: 2026-10-15
+
+- **Formula → LaTeX / Table → Markdown·CSV·JSON 全部离线规则实现**，不引入依赖、不联网。
+  公式是「Unicode 符号 / 上下标 / 希腊字母 → LaTeX + 转义」的文本转换，**不是公式排版引擎**；
+  表格则依赖 OCR 的**词包围盒**重建行列（见下）。两者都在结果里给出多种格式
+  （`data["formats"]`），UI 用下拉切换、CLI 用 `--format` 选择。
+- **表格为什么用包围盒而不是空白**：Windows OCR 会把列间空白折叠成单个空格（实测
+  甚至按词拆行），纯文本切列必然失败；而每个词的 `bounding_rect` 保留几何位置，
+  据此按 y 聚行、按 x 大间距切格、再按左边缘聚类成列，才能稳定还原表格。
+- **修复 winrt `Rect` 字段名**：本项目使用的 winrt 版本把结构体字段暴露为小写
+  `x/y/width/height`，而原代码按 PascalCase (`X/Width`) 读取并吞掉了异常 ——
+  导致 v0.1 起「用包围盒重建代码缩进」其实一直在静默回退。现在统一用
+  `_rect()` 兼容两种命名。表格提取同样受益。
+- **CLI UTF-8**：OCR 文本可能含任意 Unicode，在中文 Windows 的 GBK 控制台上
+  `print` 会抛 `UnicodeEncodeError` 使命令失败。`main()` 启动时把 stdout/stderr
+  切到 UTF-8 + `errors=replace`。
+
 ## 顺序调整记录
 
 - 2026-09-13: OCR polish（D8 CJK 规整）自 v0.2 提前 —— 属于第一阶段「OCR 结果基本正确」验收范畴。
 - 2026-09-13: v0.2 完成时顺带提前了 v0.3 的 Explain/Provider 抽象与 v0.5 的 Quick Actions（理由见 D10）。
+- 2026-10-15: v0.4 完成时顺带修复了 winrt `Rect` 字段名与 CLI UTF-8 两处静默问题（见 D16）。

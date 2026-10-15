@@ -13,7 +13,7 @@ import asyncio
 import re
 
 from ..logutil import Timer, get_logger
-from .base import OcrError, OcrResult, OCRProvider
+from .base import OcrError, OcrResult, OCRProvider, WordBox
 
 log = get_logger()
 
@@ -38,6 +38,18 @@ def tidy_cjk_text(text: str) -> str:
     return text.translate(_FW_TO_ASCII)
 
 
+def _rect(rect) -> tuple[float, float, float, float]:
+    """读取 Rect 的 (x, y, width, height)。
+
+    winrt 的 Python 投影把结构体字段暴露为小写（x/y/width/height）；不同版本
+    历史上也出现过 PascalCase，这里两种都兼容，避免静默取不到坐标。
+    """
+    try:
+        return rect.x, rect.y, rect.width, rect.height
+    except AttributeError:
+        return rect.X, rect.Y, rect.Width, rect.Height
+
+
 def _lines_with_indent(ocr) -> list[str]:
     """用 word bounding box 重建行首缩进。
 
@@ -54,13 +66,14 @@ def _lines_with_indent(ocr) -> list[str]:
             if not words:
                 rows.append(None)
                 continue
-            x0 = words[0].bounding_rect.X
+            x0 = _rect(words[0].bounding_rect)[0]
             rows.append((words, x0))
             if min_left is None or x0 < min_left:
                 min_left = x0
             for w in words:
-                if w.text and w.bounding_rect.Width > 0:
-                    widths.append(w.bounding_rect.Width / len(w.text))
+                _, _, ww, _ = _rect(w.bounding_rect)
+                if w.text and ww > 0:
+                    widths.append(ww / len(w.text))
         if min_left is None:
             return [line.text for line in ocr.lines]
         widths.sort()
@@ -78,6 +91,21 @@ def _lines_with_indent(ocr) -> list[str]:
         return out
     except Exception:  # noqa: BLE001 — 坐标重建失败不影响文本输出
         return [line.text for line in ocr.lines]
+
+
+def _word_boxes(ocr) -> list[list[WordBox]]:
+    """提取每行词的像素包围盒（供表格列对齐等结构化后处理）。失败回退为空。"""
+    out: list[list[WordBox]] = []
+    try:
+        for line in ocr.lines:
+            row = []
+            for w in line.words:
+                x, y, ww, hh = _rect(w.bounding_rect)
+                row.append(WordBox(text=w.text, x0=x, y0=y, x1=x + ww, y1=y + hh))
+            out.append(row)
+    except Exception:  # noqa: BLE001 — 坐标提取失败不影响文本输出
+        return []
+    return out
 
 
 class WindowsOcrProvider(OCRProvider):
@@ -148,7 +176,7 @@ class WindowsOcrProvider(OCRProvider):
             with Timer() as t:
                 # 超时保护：WinRT recognize_async 万一挂起，不能让 worker 线程
                 # 卡死到进程无法退出
-                text, lines, lang, w, h = asyncio.run(
+                text, lines, lang, w, h, boxes = asyncio.run(
                     asyncio.wait_for(
                         self._recognize_async(image_png, language), timeout=15.0
                     )
@@ -170,6 +198,7 @@ class WindowsOcrProvider(OCRProvider):
             width_px=w,
             height_px=h,
             elapsed_ms=t.ms,
+            word_boxes=boxes,
         )
 
     async def _recognize_async(self, image_png: bytes, language: str | None):
@@ -199,4 +228,5 @@ class WindowsOcrProvider(OCRProvider):
         ocr = await engine.recognize_async(bitmap)
         lang = engine.recognizer_language.language_tag
         lines = _lines_with_indent(ocr)
-        return ocr.text, lines, lang, bitmap.pixel_width, bitmap.pixel_height
+        boxes = _word_boxes(ocr)
+        return ocr.text, lines, lang, bitmap.pixel_width, bitmap.pixel_height, boxes

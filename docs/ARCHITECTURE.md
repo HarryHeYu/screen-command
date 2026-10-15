@@ -68,12 +68,21 @@ ActionResult:
   ok: bool
   text: str            # 纯文本视图
   markdown: str|None   # 富文本视图
-  data: dict           # action 特有（如 table 的 csv）
+  data: dict           # action 特有（如 table 的 csv / word_boxes）
   error: str|None
   elapsed_ms: float
 ```
 
-UI 只消费 `text/markdown`，复制/保存按 type 分发 —— 不允许 action 往 UI 塞裸字符串了事。
+`data["formats"]`（可选）＝ `{格式名: 文本}`：动作产出多种格式时（表格的
+Markdown/CSV/JSON、公式的 LaTeX/显示式），UI 用下拉切换、CLI 用 `--format` 选择。
+UI 只消费 `text/markdown/formats`，复制/保存按 type 分发 —— 不允许 action 往 UI 塞裸字符串了事。
+
+## OcrResult 与结构后处理
+
+`OcrResult` 除 `text/lines` 外，provider 可提供 `word_boxes: list[list[WordBox]]`
+（每行词的像素包围盒）。Windows OCR 会折叠列间空白、剥掉行首缩进，仅凭文本无法恢复结构；
+缩进重建与表格列重建都依赖这些坐标。**注意 winrt 的 `Rect` 字段是小写 `x/y/width/height`**
+（见 D16），读取一律走 `windows_ocr._rect()`。
 
 ## 线程模型
 

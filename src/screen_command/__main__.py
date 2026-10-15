@@ -11,6 +11,20 @@ import argparse
 import sys
 
 
+def _configure_stdio() -> None:
+    """把 CLI 的 stdout/stderr 切到 UTF-8 且容错。
+
+    OCR 文本可能包含任意 Unicode（含罕见的希腊字母、商 ß 等），在中文
+    Windows 的 GBK 控制台上直接 print 会抛 UnicodeEncodeError 导致命令失败。
+    这里统一为 UTF-8 + errors=replace：不再因个别字符中断整个命令。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def _cmd_run(args) -> int:
     from PySide6.QtWidgets import QApplication
 
@@ -54,14 +68,24 @@ def _cmd_process(args) -> int:
     if not result.ok:
         print(f"error: {result.error}", file=sys.stderr)
         return 1
+    variants = result.data.get("formats") or {}
+    if args.format:
+        if args.format not in variants:
+            available = ", ".join(variants) or "none"
+            print(f"error: unknown format {args.format!r} (available: {available})",
+                  file=sys.stderr)
+            return 2
+        output_text = variants[args.format]
+    elif args.md and result.markdown:
+        output_text = result.markdown
+    else:
+        output_text = result.text
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.text)
+            f.write(output_text)
         print(f"saved → {args.output}")
-    elif args.md and result.markdown:
-        print(result.markdown)
     else:
-        print(result.text)
+        print(output_text)
     meta = result.data
     if meta:
         print(
@@ -87,6 +111,7 @@ def _cmd_providers(_args) -> int:
 def main(argv: list[str] | None = None) -> int:
     from . import __version__
 
+    _configure_stdio()
     parser = argparse.ArgumentParser(
         prog="screen_command",
         description="框选屏幕区域 → 识别内容 → 直接执行动作。",
@@ -103,12 +128,15 @@ def main(argv: list[str] | None = None) -> int:
     p_proc = sub.add_parser("process", help="对图片执行 action（测试 harness）")
     p_proc.add_argument("image", help="PNG/JPEG 图片路径")
     p_proc.add_argument("--action", default="ocr",
-                        help="ocr | copy_text | translate | code | markdown | explain | save_image")
+                        help="ocr | copy_text | translate | code | markdown | explain | "
+                             "formula | table | save_image")
     p_proc.add_argument("--provider", default="auto", help="auto | windows | mock")
     p_proc.add_argument("--language", default=None, help="BCP-47，如 zh-Hans-CN")
     p_proc.add_argument("--output", default=None, help="结果写入文件")
     p_proc.add_argument("--md", action="store_true",
-                        help="结果有 markdown 视图时（code/markdown）输出 markdown")
+                        help="结果有 markdown 视图时（code/markdown/formula/table）输出 markdown")
+    p_proc.add_argument("--format", default=None,
+                        help="多格式结果（table: Markdown|CSV|JSON；formula: LaTeX|LaTeX（显示式））选择输出格式")
     p_proc.add_argument("--opt", action="append", nargs=2, metavar=("KEY", "VALUE"),
                         help="传给 action 的选项，如 --opt output_path out.png")
     p_proc.set_defaults(func=_cmd_process)

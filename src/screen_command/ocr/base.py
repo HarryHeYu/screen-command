@@ -11,6 +11,17 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class WordBox:
+    """一个词及其在图片中的像素矩形（供缩进重建、表格列对齐等结构化后处理）。"""
+
+    text: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+@dataclass
 class OcrResult:
     text: str
     lines: list[str] = field(default_factory=list)
@@ -19,6 +30,8 @@ class OcrResult:
     width_px: int = 0
     height_px: int = 0
     elapsed_ms: float = 0.0
+    # 每行的词级包围盒（provider 支持时提供；不支持则为空）
+    word_boxes: list[list[WordBox]] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:

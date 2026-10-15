@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -30,6 +31,11 @@ QPushButton#rBtn, QPushButton#rPrimary {
 QPushButton#rBtn:hover { background: #3a4048; }
 QPushButton#rPrimary { background: #0e6d8c; }
 QPushButton#rPrimary:hover { background: #1284a8; }
+QComboBox#rFormat {
+    background: #23262d; color: #e8e8ea; border: 1px solid #33383f;
+    border-radius: 5px; padding: 2px 8px; font-size: 11px;
+}
+QComboBox#rFormat::drop-down { border: none; width: 16px; }
 """
 
 
@@ -53,6 +59,19 @@ class ResultWindow(QWidget):
         self._title.setObjectName("rTitle")
         self._meta = QLabel("")
         self._meta.setObjectName("rMeta")
+
+        # 多格式结果（如表格的 Markdown / CSV / JSON）：一个下拉切换视图，复制跟随当前视图
+        self._format = QComboBox()
+        self._format.setObjectName("rFormat")
+        self._format.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._format.hide()
+        self._format.currentTextChanged.connect(self._on_format_changed)
+        self._variants: dict[str, str] = {}
+
+        meta_row = QHBoxLayout()
+        meta_row.setContentsMargins(0, 0, 0, 0)
+        meta_row.addWidget(self._meta, 1)
+        meta_row.addWidget(self._format)
 
         self._text = QTextEdit()
         self._text.setObjectName("rText")
@@ -87,7 +106,7 @@ class ResultWindow(QWidget):
         btns.addStretch(1)
 
         layout.addWidget(self._title)
-        layout.addWidget(self._meta)
+        layout.addLayout(meta_row)
         layout.addWidget(self._text, 1)
         layout.addLayout(btns)
 
@@ -96,8 +115,22 @@ class ResultWindow(QWidget):
     def show_result(self, result: ActionResult) -> None:
         self._last_result = result
         self._title.setText("结果 — 识别成功" if result.ok else "结果 — 失败")
+        # 多格式结果：下拉切换；同时把首格式设为默认视图
+        self._variants = dict(result.data.get("formats") or {})
+        multi = result.ok and len(self._variants) > 1
+        if multi:
+            self._format.blockSignals(True)
+            self._format.clear()
+            self._format.addItems(list(self._variants))
+            self._format.setCurrentIndex(0)
+            self._format.blockSignals(False)
+            self._format.show()
+        else:
+            self._format.hide()
         if result.ok:
-            self._text.setPlainText(result.text)
+            self._text.setPlainText(
+                self._variants[self._format.currentText()] if multi else result.text
+            )
             meta = [f"{result.data.get('provider', '')}".strip(),
                     f"{result.elapsed_ms:.0f} ms"]
             lang = result.data.get("language")
@@ -106,6 +139,9 @@ class ResultWindow(QWidget):
             size = result.data.get("width_px")
             if size:
                 meta.insert(2, f"{size}×{result.data.get('height_px')} px")
+            rows = result.data.get("row_count")
+            if rows:
+                meta.append(f"{rows} 行 × {result.data.get('col_count')} 列")
             if result.data.get("copied"):
                 meta.append("已复制到剪贴板")
             self._meta.setText(" · ".join(m for m in meta if m))
@@ -120,6 +156,11 @@ class ResultWindow(QWidget):
         self.show()
         self.raise_()
         self.activateWindow()
+
+    def _on_format_changed(self, name: str) -> None:
+        # 切换格式即以所选格式重置正文（编辑态下会覆盖手改内容，属预期）
+        if name in self._variants:
+            self._text.setPlainText(self._variants[name])
 
     def _copy(self) -> None:
         from PySide6.QtWidgets import QApplication

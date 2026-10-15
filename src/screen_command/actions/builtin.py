@@ -43,6 +43,7 @@ class OCRAction(Action):
                     "width_px": r.width_px,
                     "height_px": r.height_px,
                     "lines": r.lines,  # 供 Code/Markdown 等下游动作使用
+                    "word_boxes": r.word_boxes,  # 供 Table 等需要列对齐的动作使用
                 },
                 elapsed_ms=t.ms,
             )

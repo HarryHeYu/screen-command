@@ -43,6 +43,64 @@ class TestProviderFactory:
             make_provider("no-such-provider")
 
 
+class TestWordBoxExtraction:
+    """词包围盒提取：兼容 winrt Rect 的小写字段，并据此重建缩进。"""
+
+    class _Rect:
+        def __init__(self, x, y, w, h):
+            self.x = x
+            self.y = y
+            self.width = w
+            self.height = h
+
+    class _Word:
+        def __init__(self, text, rect):
+            self.text = text
+            self.bounding_rect = rect
+
+    class _Line:
+        def __init__(self, words):
+            self.words = words
+            self.text = " ".join(w.text for w in words)
+
+    class _Ocr:
+        def __init__(self, lines):
+            self.lines = lines
+
+    def test_rect_reads_lowercase_fields(self):
+        from screen_command.ocr.windows_ocr import _rect
+
+        assert _rect(self._Rect(1, 2, 3, 4)) == (1, 2, 3, 4)
+
+    def test_rect_reads_pascal_case_fields(self):
+        from screen_command.ocr.windows_ocr import _rect
+
+        class PascalRect:
+            X, Y, Width, Height = 5, 6, 7, 8
+
+        assert _rect(PascalRect()) == (5, 6, 7, 8)
+
+    def test_word_boxes_extracted(self):
+        from screen_command.ocr.windows_ocr import _word_boxes
+
+        line = self._Line([self._Word("hi", self._Rect(10, 20, 30, 15))])
+        boxes = _word_boxes(self._Ocr([line]))
+        assert boxes[0][0].text == "hi"
+        assert (boxes[0][0].x0, boxes[0][0].x1) == (10, 40)
+        assert (boxes[0][0].y0, boxes[0][0].y1) == (20, 35)
+
+    def test_indent_reconstructed_from_boxes(self):
+        from screen_command.ocr.windows_ocr import _lines_with_indent
+
+        lines = self._Ocr([
+            self._Line([self._Word("def", self._Rect(10, 0, 30, 15))]),
+            self._Line([self._Word("return", self._Rect(40, 20, 60, 15))]),
+        ])
+        out = _lines_with_indent(lines)
+        assert out[0] == "def"
+        assert out[1] == "   return"  # (40-10)/10 = 3 字符缩进
+
+
 def test_windows_provider_uses_constructor_language():
     """CLI --language / 构造参数必须真正选引擎，不能只写进结果标签。"""
     from screen_command.ocr.windows_ocr import WindowsOcrProvider
@@ -93,6 +151,12 @@ class TestWindowsOcrIntegration:
     def test_small_text(self, provider, fixtures):
         r = provider.recognize(self._png(fixtures["small_text.png"]))
         assert "annotation" in r.text.lower()
+
+    def test_word_boxes_available(self, provider, fixtures):
+        """锁定 winrt Rect 小写字段修复：真实识别必须给出词包围盒。"""
+        r = provider.recognize(self._png(fixtures["en_paragraph.png"]))
+        assert r.word_boxes
+        assert all(w.text for row in r.word_boxes for w in row)
 
     def test_bad_image_raises(self, provider):
         with pytest.raises(OcrError):

@@ -46,3 +46,33 @@ class TestResultWindow:
         assert w._btn_copy.isEnabled()
         assert w._btn_edit.isEnabled()
         w.close()
+
+    def test_multiformat_switcher_visible_and_switches(self):
+        w = ResultWindow()
+        w.show_result(ActionResult(
+            "table", ok=True, text="md",
+            data={"formats": {"Markdown": "md", "CSV": "a,b", "JSON": "[]"}},
+        ))
+        assert not w._format.isHidden()
+        assert w._text.toPlainText() == "md"
+        w._format.setCurrentText("CSV")
+        assert w._text.toPlainText() == "a,b"
+        w._format.setCurrentText("JSON")
+        assert w._text.toPlainText() == "[]"
+        w.close()
+
+    def test_single_format_hides_switcher(self):
+        w = ResultWindow()
+        w.show_result(ActionResult(
+            "formula", ok=True, text="x^2",
+            data={"formats": {"LaTeX": "x^2"}},
+        ))
+        assert w._format.isHidden()
+        assert w._text.toPlainText() == "x^2"
+        w.close()
+
+    def test_failure_hides_switcher(self):
+        w = ResultWindow()
+        w.show_result(ActionResult("table", ok=False, error="no table"))
+        assert w._format.isHidden()
+        w.close()

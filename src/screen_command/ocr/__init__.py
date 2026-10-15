@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import sys
 
-from .base import OcrError, OcrResult, OCRProvider
+from .base import OcrError, OcrResult, OCRProvider, WordBox
 from .mock import MockOcrProvider
 
-__all__ = ["OCRProvider", "OcrResult", "OcrError", "make_provider", "MockOcrProvider"]
+__all__ = ["OCRProvider", "OcrResult", "OcrError", "WordBox", "make_provider",
+           "MockOcrProvider"]
 
 
 def make_provider(name: str = "auto", language: str | None = None) -> OCRProvider:

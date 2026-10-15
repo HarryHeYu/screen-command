@@ -87,7 +87,7 @@ class TestRegistry:
         actions = build_default_actions(provider)
         ids = [a.id for a in actions]
         assert ids == ["ocr", "copy_text", "translate", "code", "markdown",
-                       "explain", "save_image"]
+                       "explain", "save_image", "formula", "table"]
         assert all(isinstance(a, Action) for a in actions)
 
     def test_all_actions_registered(self, provider):
@@ -96,7 +96,8 @@ class TestRegistry:
         clear_actions()
         build_default_actions(provider)
         assert {a.id for a in all_actions()} >= {
-            "ocr", "copy_text", "translate", "code", "markdown", "explain", "save_image",
+            "ocr", "copy_text", "translate", "code", "markdown", "explain",
+            "save_image", "formula", "table",
         }
 
 
