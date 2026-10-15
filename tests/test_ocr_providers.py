@@ -19,6 +19,19 @@ def provider():
     return p
 
 
+def _has_language(provider, prefix: str) -> bool:
+    """该机器是否安装了以 prefix 开头的 OCR 语言包（如 'zh'）。"""
+    return any(lang.lower().startswith(prefix) for lang in provider.languages)
+
+
+def test_language_availability_helper():
+    class P:
+        languages = ["en-US"]
+
+    assert _has_language(P(), "en")
+    assert not _has_language(P(), "zh")
+
+
 class TestMockProvider:
     def test_recognize_returns_configured_text(self):
         p = MockOcrProvider("hello\nworld")
@@ -129,7 +142,9 @@ class TestWindowsOcrIntegration:
         assert "user location" in t
 
     def test_chinese(self, provider, fixtures):
-        r = provider.recognize(self._png(fixtures["zh_paragraph.png"]))
+        if not _has_language(provider, "zh"):
+            pytest.skip("zh-Hans-CN OCR language pack not installed (e.g. GitHub runner)")
+        r = provider.recognize(self._png(fixtures["zh_paragraph.png"]), language="zh-Hans-CN")
         assert "机器学习" in r.text
         assert "深度学习" in r.text
 
@@ -145,8 +160,10 @@ class TestWindowsOcrIntegration:
 
     def test_code(self, provider, fixtures):
         r = provider.recognize(self._png(fixtures["code.png"]))
-        assert "def train" in r.text
-        assert "model.train" in r.text or "model . train" in r.text
+        compact = r.text.replace(" ", "")
+        assert "deftrain" in compact
+        assert "model.train()" in compact  # 容忍 OCR 在点后插入空格
+        assert any(line.startswith(" ") for line in r.lines)  # 缩进被重建
 
     def test_small_text(self, provider, fixtures):
         r = provider.recognize(self._png(fixtures["small_text.png"]))
@@ -163,6 +180,8 @@ class TestWindowsOcrIntegration:
             provider.recognize(b"not a png at all")
 
     def test_explicit_language(self, provider, fixtures):
+        if not _has_language(provider, "zh"):
+            pytest.skip("zh-Hans-CN OCR language pack not installed")
         r = provider.recognize(self._png(fixtures["zh_paragraph.png"]),
                                language="zh-Hans-CN")
         assert "损失函数" in r.text

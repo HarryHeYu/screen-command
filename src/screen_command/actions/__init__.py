@@ -34,10 +34,6 @@ __all__ = [
     "TableToMarkdownAction",
 ]
 
-# 动作 id → 构造方式（provider 注入需求不同）
-PROVIDER_BASED = {"ocr", "copy_text", "translate", "code", "markdown", "explain",
-                  "formula", "table"}
-
 
 def build_default_actions(
     ocr_provider,

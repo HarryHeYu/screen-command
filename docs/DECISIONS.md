@@ -171,6 +171,10 @@ v0.1/v0.2 用一个置顶小窗口（Capture 按钮 / 热键状态 / 退出）�
 - **CLI UTF-8**：OCR 文本可能含任意 Unicode，在中文 Windows 的 GBK 控制台上
   `print` 会抛 `UnicodeEncodeError` 使命令失败。`main()` 启动时把 stdout/stderr
   切到 UTF-8 + `errors=replace`。
+- **修复长期失败的 CI**：OCR 集成测试原先假定机器装有 `zh-Hans-CN`，而 GitHub
+  runner 只有 `en-US`，导致 `test_chinese` / `test_explicit_language` / `test_code`
+  从 v0.2.1 起在 CI 上一直红。现在按实际语言包跳过中文用例（`_has_language`），
+  并让代码断言容忍 OCR 在点号后插入空格（`model. train()`）。
 
 ## 顺序调整记录
 
